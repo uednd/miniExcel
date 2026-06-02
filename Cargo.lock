@@ -731,6 +731,7 @@ dependencies = [
  "color-eyre",
  "crossterm",
  "ratatui",
+ "unicode-width",
 ]
 
 [[package]]

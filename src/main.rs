@@ -8,6 +8,7 @@ use std::time::{Duration, Instant};
 
 use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
 use ratatui::{DefaultTerminal, Frame, layout::Rect, style::Stylize, widgets::Paragraph};
+use unicode_width::UnicodeWidthStr;
 
 const EXIT_CONFIRM_TIMEOUT: Duration = Duration::from_secs(1);
 
@@ -91,9 +92,9 @@ fn render(frame: &mut Frame, state: ExitState) {
 
     if let ExitState::ConfirmOnce(_) = state {
         let hint = "再次按下 Ctrl+C 以退出";
-        let hint_w = hint.len() as u16;
+        let hint_w = UnicodeWidthStr::width(hint) as u16;
         let hint_x = area.x + (area.width.saturating_sub(hint_w)) / 2;
-        let hint_y = art_area.y + art_area.height;
+        let hint_y = art_area.y + art_area.height + 1;
         let hint_rect = Rect::new(hint_x, hint_y, hint_w, 1);
         let hint_paragraph = Paragraph::new(hint).yellow().bold();
 
