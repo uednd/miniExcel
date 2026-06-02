@@ -2,7 +2,7 @@
 name = "mini-excel"
 version = "0.1.0"
 description = "A TUI based mini Excel"
-authors = ["UE-DND <100979820+UE-DND@users.noreply.github.com>"]
+authors = ["uednd <247128190+uednd@users.noreply.github.com>"]
 license = "MIT"
 edition = "2024"
 
