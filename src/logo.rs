@@ -1,6 +1,4 @@
 //! ASCII 艺术字 logo 模块。
-//!
-//! 将 "miniExcel" 词标渲染为双色 ASCII 艺术字横幅，并居中显示在终端窗口中。
 
 use ratatui::{
     Frame,
@@ -26,36 +24,43 @@ const EXCEL_ART: &[&str] = &[
     "▀▀▀▀ ▀  ▀ ▀▀▀▀ ▀▀▀▀ ▀▀",
 ];
 
-/// 在给定区域内居中渲染 "miniExcel" ASCII 艺术字 logo。
-///
-/// 返回 logo 占据的 [`Rect`]，调用方可据此定位其他 UI 元素（如退出提示）。
-pub fn render(frame: &mut Frame, area: Rect) -> Rect {
-    let art_lines: Vec<Line> = MINI_ART
-        .iter()
-        .zip(EXCEL_ART)
-        .map(|(mini, excel)| {
-            Line::from(vec![
-                Span::styled(*mini, Style::default().fg(MINI_COLOR)),
-                Span::styled(*excel, Style::default().fg(EXCEL_COLOR)),
-            ])
-        })
-        .collect();
+pub const LOGO_HEIGHT: u16 = MINI_ART.len() as u16;
 
-    let art_height = art_lines.len() as u16;
+pub struct Logo;
 
-    let art_width = art_lines
-        .iter()
-        .map(|l| l.width() as u16)
-        .max()
-        .unwrap_or(0);
+impl Logo {
+    /// 创建 Logo 组件实例。
+    pub fn new() -> Self {
+        Self
+    }
 
-    let art_area = area.centered(
-        Constraint::Length(art_width),
-        Constraint::Length(art_height),
-    );
+    /// 渲染项目 Logo。
+    pub fn render(&self, frame: &mut Frame, area: Rect) {
+        let art_lines: Vec<Line> = MINI_ART
+            .iter()
+            .zip(EXCEL_ART)
+            .map(|(mini, excel)| {
+                Line::from(vec![
+                    Span::styled(*mini, Style::default().fg(MINI_COLOR)),
+                    Span::styled(*excel, Style::default().fg(EXCEL_COLOR)),
+                ])
+            })
+            .collect();
 
-    let paragraph = Paragraph::new(Text::from(art_lines));
-    frame.render_widget(paragraph, art_area);
+        let art_height = LOGO_HEIGHT;
 
-    art_area
+        let art_width = art_lines
+            .iter()
+            .map(|l| l.width() as u16)
+            .max()
+            .unwrap_or(0);
+
+        let art_area = area.centered(
+            Constraint::Length(art_width),
+            Constraint::Length(art_height),
+        );
+
+        let paragraph = Paragraph::new(Text::from(art_lines));
+        frame.render_widget(paragraph, art_area);
+    }
 }

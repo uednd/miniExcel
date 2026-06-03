@@ -1,15 +1,24 @@
 //! App 状态管理与事件循环。
+//!
+//! 包含主事件循环、键盘事件分发及各 UI 组件的渲染调度。
 
 use std::time::{Duration, Instant};
 
 use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
-use ratatui::{layout::Rect, style::Stylize, widgets::Paragraph, DefaultTerminal, Frame};
+use ratatui::{
+    DefaultTerminal, Frame,
+    layout::Rect,
+    style::Stylize,
+    style::{Color, Style},
+    widgets::Block,
+    widgets::Paragraph,
+};
 use unicode_width::UnicodeWidthStr;
 
-use crate::menu::Menu;
+use crate::{footer::Footer, logo::LOGO_HEIGHT, logo::Logo, menu::LOGO_MENU_GAP, menu::Menu};
 
+const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 const EXIT_CONFIRM_TIMEOUT: Duration = Duration::from_secs(1);
-const LOGO_MENU_GAP: u16 = 2;
 
 #[derive(Debug)]
 enum ExitState {
@@ -18,15 +27,24 @@ enum ExitState {
     Confirmed,
 }
 
+/// 应用全局状态，持有各 UI 组件及退出状态。
 pub struct App {
+    logo: Logo,
     menu: Menu,
+    footer: Footer,
     exit_state: ExitState,
 }
 
 impl App {
+    /// 创建应用实例，初始化各 UI 组件并获取当前工作目录路径。
     pub fn new() -> Self {
+        let cwd = std::env::current_dir()
+            .map(|p| p.display().to_string())
+            .unwrap_or_else(|_| String::from("."));
         Self {
+            logo: Logo::new(),
             menu: Menu::new(),
+            footer: Footer::new(cwd, APP_VERSION.to_string()),
             exit_state: ExitState::Idle,
         }
     }
@@ -73,7 +91,7 @@ impl App {
         }
     }
 
-    // 处理键盘事件
+    /// 处理键盘事件，分发到对应组件或更新退出状态。
     fn handle_key(&mut self, key: crossterm::event::KeyEvent) {
         match key.code {
             KeyCode::Left => {
@@ -111,19 +129,25 @@ impl App {
         }
     }
 
+    /// 渲染主界面。
     fn render(&self, frame: &mut Frame) {
         let area = frame.area();
-        let art_area = crate::logo::render(frame, area);
 
-        let menu_y = art_area.y + art_area.height + LOGO_MENU_GAP;
-        let menu_origin = Rect::new(area.x, menu_y, area.width, 1);
-        let menu_area = self.menu.render(frame, menu_origin);
+        frame.render_widget(
+            Block::new().style(Style::default().bg(Color::Rgb(0, 0, 0))),
+            area,
+        );
+
+        self.logo.render(frame, area);
+        self.menu.render(frame, area);
+        self.footer.render(frame, area);
 
         if let ExitState::ConfirmOnce(_) = self.exit_state {
             let hint = "再次按下 Ctrl+C 以退出";
             let hint_w = UnicodeWidthStr::width(hint) as u16;
             let hint_x = area.x + (area.width.saturating_sub(hint_w)) / 2;
-            let hint_y = menu_area.y + menu_area.height + 1;
+            let logo_bottom = area.y + (area.height.saturating_sub(LOGO_HEIGHT)) / 2 + LOGO_HEIGHT;
+            let hint_y = logo_bottom + LOGO_MENU_GAP + 1;
             let hint_rect = Rect::new(hint_x, hint_y, hint_w, 1);
             frame.render_widget(Paragraph::new(hint).yellow().bold(), hint_rect);
         }

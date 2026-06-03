@@ -3,6 +3,7 @@
 //! 按两次 Ctrl+C 退出。
 
 mod app;
+mod footer;
 mod logo;
 mod menu;
 
