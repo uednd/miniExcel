@@ -5,23 +5,18 @@
 
 use ratatui::{
     Frame,
-    layout::{Constraint, Rect},
+    layout::{Constraint, Layout, Rect},
     style::{Color, Modifier, Style},
-    text::{Line, Span, Text},
+    text::Line,
     widgets::Paragraph,
 };
-use unicode_width::UnicodeWidthStr;
 
-use crate::logo::LOGO_HEIGHT;
-
-/// logo 底部到菜单顶部的间距。
-pub const LOGO_MENU_GAP: u16 = 2;
 /// 选中项背景色。
 const THEME_GREEN: Color = Color::Rgb(80, 160, 100);
 /// 选中项文字色。
 const SELECTED_TEXT: Color = Color::Rgb(16, 32, 22);
-/// 菜单项左右两侧的内边距（字符数）。
-const HORIZONTAL_PADDING: usize = 2;
+/// 未选中项文字色。
+const UNSELECTED_TEXT: Color = Color::Rgb(160, 160, 160);
 /// 菜单项标签。
 const MENU_ITEMS: [&str; 3] = ["新建表格", "最近打开", "设置"];
 
@@ -48,59 +43,28 @@ impl Menu {
         }
     }
 
-    /// 在 logo 下方居中渲染横向菜单。
+    /// 在给定区域内居中渲染横向菜单。
     pub fn render(&self, frame: &mut Frame, area: Rect) {
-        let line = Line::from(menu_spans(self.selected));
-        let width = line.width() as u16;
+        let menu_area = area.centered_horizontally(Constraint::Percentage(50));
+        let chunks: [Rect; MENU_ITEMS.len()] =
+            Layout::horizontal([Constraint::Fill(1); MENU_ITEMS.len()]).areas(menu_area);
 
-        let logo_bottom = area.y + (area.height.saturating_sub(LOGO_HEIGHT)) / 2 + LOGO_HEIGHT;
-        let menu_y = logo_bottom + LOGO_MENU_GAP;
-        let menu_origin = Rect::new(area.x, menu_y, area.width, 1);
-        let menu_area = menu_origin.centered(Constraint::Length(width), Constraint::Length(1));
+        let selected_style = Style::default()
+            .fg(SELECTED_TEXT)
+            .bg(THEME_GREEN)
+            .add_modifier(Modifier::BOLD);
+        let unselected_style = Style::default().fg(UNSELECTED_TEXT);
 
-        let paragraph = Paragraph::new(Text::from(line));
-        frame.render_widget(paragraph, menu_area);
-    }
-}
-
-/// 构建菜单项的 [`Span`] 列表，高亮当前选中项。
-fn menu_spans(selected: usize) -> Vec<Span<'static>> {
-    let item_width = menu_item_width();
-
-    MENU_ITEMS
-        .iter()
-        .enumerate()
-        .map(|(i, label)| {
-            let style = if i == selected {
-                Style::default()
-                    .fg(SELECTED_TEXT)
-                    .bg(THEME_GREEN)
-                    .add_modifier(Modifier::BOLD)
+        for (i, label) in MENU_ITEMS.iter().enumerate() {
+            let style = if i == self.selected {
+                selected_style
             } else {
-                Style::default().fg(Color::Rgb(160, 160, 160))
+                unselected_style
             };
-
-            Span::styled(centered_label(label, item_width), style)
-        })
-        .collect()
-}
-
-/// 计算绘制单个菜单项所需的字符宽度。
-fn menu_item_width() -> usize {
-    MENU_ITEMS
-        .iter()
-        .map(|label| UnicodeWidthStr::width(*label))
-        .max()
-        .unwrap_or(0)
-        + HORIZONTAL_PADDING * 2
-}
-
-/// 将标签文本在指定宽度内居中填充。
-fn centered_label(label: &str, width: usize) -> String {
-    let label_width = UnicodeWidthStr::width(label);
-    let padding = width.saturating_sub(label_width);
-    let left = padding / 2;
-    let right = padding - left;
-
-    format!("{}{}{}", " ".repeat(left), label, " ".repeat(right))
+            frame.render_widget(
+                Paragraph::new(Line::from(*label)).centered().style(style),
+                chunks[i],
+            );
+        }
+    }
 }

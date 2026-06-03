@@ -2,23 +2,28 @@
 //!
 //! 包含主事件循环、键盘事件分发及各 UI 组件的渲染调度。
 
-use std::time::{Duration, Instant};
+use std::{
+    path::{Path, PathBuf},
+    time::{Duration, Instant},
+};
 
 use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
 use ratatui::{
     DefaultTerminal, Frame,
-    layout::Rect,
+    layout::{Constraint, Layout},
     style::Stylize,
     style::{Color, Style},
     widgets::Block,
     widgets::Paragraph,
 };
-use unicode_width::UnicodeWidthStr;
 
-use crate::{footer::Footer, logo::LOGO_HEIGHT, logo::Logo, menu::LOGO_MENU_GAP, menu::Menu};
+use crate::{footer::Footer, logo::LOGO_HEIGHT, logo::Logo, menu::Menu};
 
 const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 const EXIT_CONFIRM_TIMEOUT: Duration = Duration::from_secs(1);
+
+/// logo 到菜单的间距。
+const LOGO_MENU_GAP: u16 = 2;
 
 #[derive(Debug)]
 enum ExitState {
@@ -38,9 +43,14 @@ pub struct App {
 impl App {
     /// 创建应用实例，初始化各 UI 组件并获取当前工作目录路径。
     pub fn new() -> Self {
-        let cwd = std::env::current_dir()
-            .map(|p| p.display().to_string())
-            .unwrap_or_else(|_| String::from("."));
+        let cwd_path = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+        let home = std::env::var("HOME")
+            .or_else(|_| std::env::var("USERPROFILE"))
+            .ok();
+        let cwd = match home.and_then(|h| cwd_path.strip_prefix(Path::new(&h)).ok()) {
+            Some(rest) => format!("~/{}", rest.display()),
+            None => cwd_path.display().to_string(),
+        };
         Self {
             logo: Logo::new(),
             menu: Menu::new(),
@@ -133,23 +143,37 @@ impl App {
     fn render(&self, frame: &mut Frame) {
         let area = frame.area();
 
+        // 黑色背景
         frame.render_widget(
-            Block::new().style(Style::default().bg(Color::Rgb(0, 0, 0))),
+            Block::new().style(Style::default().bg(Color::Rgb(10, 10, 10))),
             area,
         );
 
-        self.logo.render(frame, area);
-        self.menu.render(frame, area);
-        self.footer.render(frame, area);
+        let [body, footer_area] =
+            Layout::vertical([Constraint::Fill(1), Constraint::Length(1)]).areas(area);
+
+        let [_, logo_area, _, menu_area, hint_area, _] = Layout::vertical([
+            Constraint::Fill(1),
+            Constraint::Length(LOGO_HEIGHT),
+            Constraint::Length(LOGO_MENU_GAP),
+            Constraint::Length(1),
+            Constraint::Length(1),
+            Constraint::Fill(1),
+        ])
+        .areas(body);
+
+        self.logo.render(frame, logo_area);
+        self.menu.render(frame, menu_area);
+        self.footer.render(frame, footer_area);
 
         if let ExitState::ConfirmOnce(_) = self.exit_state {
-            let hint = "再次按下 Ctrl+C 以退出";
-            let hint_w = UnicodeWidthStr::width(hint) as u16;
-            let hint_x = area.x + (area.width.saturating_sub(hint_w)) / 2;
-            let logo_bottom = area.y + (area.height.saturating_sub(LOGO_HEIGHT)) / 2 + LOGO_HEIGHT;
-            let hint_y = logo_bottom + LOGO_MENU_GAP + 1;
-            let hint_rect = Rect::new(hint_x, hint_y, hint_w, 1);
-            frame.render_widget(Paragraph::new(hint).yellow().bold(), hint_rect);
+            frame.render_widget(
+                Paragraph::new("再次按下 Ctrl+C 以退出")
+                    .centered()
+                    .yellow()
+                    .bold(),
+                hint_area,
+            );
         }
     }
 }
