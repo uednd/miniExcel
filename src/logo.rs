@@ -34,12 +34,10 @@ pub const LOGO_HEIGHT: u16 = {
 pub struct Logo;
 
 impl Logo {
-    /// 创建 Logo 组件实例。
     pub fn new() -> Self {
         Self
     }
 
-    /// 在给定区域内居中渲染 "miniExcel" ASCII 艺术字 logo。
     pub fn render(&self, frame: &mut Frame, area: Rect) {
         let art_lines: Vec<Line> = MINI_ART
             .into_iter()

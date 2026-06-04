@@ -1,30 +1,44 @@
 //! App 状态管理与事件循环。
 //!
-//! 包含主事件循环、键盘事件分发。渲染与画面逻辑委托给 Screen trait 实现。
+//! 包含主事件循环、键盘事件分发、全局元素渲染。
 
 use std::time::Duration;
 
 use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
-use ratatui::DefaultTerminal;
+use ratatui::{
+    DefaultTerminal,
+    layout::{Constraint, Layout},
+    style::{Color, Style},
+    widgets::Block,
+};
 
 use crate::{
     exit_handler::ExitHandler,
+    footer::Footer,
     menu_screen::MenuScreen,
     screen::{Screen, ScreenCommand},
 };
+
+const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// 应用全局状态。
 pub struct App {
     active_screen: Box<dyn Screen>,
     exit_handler: ExitHandler,
+    footer: Footer,
 }
 
 impl App {
-    /// 创建应用实例。
     pub fn new() -> Self {
+        let full_cwd = std::env::current_dir()
+            .map(|p| p.display().to_string())
+            .unwrap_or_else(|_| String::from("."));
+        let cwd = replace_homedir::replace_homedir(&full_cwd, "~");
+
         Self {
             active_screen: Box::new(MenuScreen::new()),
             exit_handler: ExitHandler::new(Duration::from_secs(1)),
+            footer: Footer::new(cwd, APP_VERSION.to_string()),
         }
     }
 
@@ -40,13 +54,26 @@ impl App {
             self.exit_handler.tick();
 
             let hint = self.exit_handler.hint_text();
-            
-            terminal.draw(|frame| self.active_screen.render(frame, hint))?;
+
+            terminal.draw(|frame| {
+                let area = frame.area();
+
+                // 黑色背景
+                frame.render_widget(
+                    Block::new().style(Style::default().bg(Color::Rgb(10, 10, 10))),
+                    area,
+                );
+
+                let [body, footer_area] =
+                    Layout::vertical([Constraint::Fill(1), Constraint::Length(2)]).areas(area);
+
+                self.active_screen.render(frame, body, hint);
+                self.footer.render(frame, footer_area);
+            })?;
 
             if !event::poll(self.exit_handler.poll_timeout())? {
                 continue;
             }
-
             if let Event::Key(key) = event::read()?
                 && key.kind == KeyEventKind::Press
             {

@@ -18,7 +18,6 @@ pub struct ExitHandler {
 }
 
 impl ExitHandler {
-    /// 创建退出确认处理器。
     pub fn new(timeout: Duration) -> Self {
         Self {
             state: State::Idle,
@@ -78,4 +77,3 @@ impl ExitHandler {
         }
     }
 }
-

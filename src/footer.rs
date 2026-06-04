@@ -20,7 +20,6 @@ pub struct Footer {
 }
 
 impl Footer {
-    /// 创建底栏实例，保存路径和版本号字符串。
     pub fn new(current_dir: String, version: String) -> Self {
         Self {
             current_dir,
@@ -28,7 +27,6 @@ impl Footer {
         }
     }
 
-    /// 在终端底部渲染底栏。
     pub fn render(&self, frame: &mut Frame, area: Rect) {
         let block = Block::new().padding(Padding::new(2, 2, 0, 1));
 
