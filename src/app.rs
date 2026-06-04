@@ -2,10 +2,7 @@
 //!
 //! 包含主事件循环、键盘事件分发及各 UI 组件的渲染调度。
 
-use std::{
-    path::{Path, PathBuf},
-    time::{Duration, Instant},
-};
+use std::time::{Duration, Instant};
 
 use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
 use ratatui::{
@@ -43,14 +40,10 @@ pub struct App {
 impl App {
     /// 创建应用实例，初始化各 UI 组件并获取当前工作目录路径。
     pub fn new() -> Self {
-        let cwd_path = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-        let home = std::env::var("HOME")
-            .or_else(|_| std::env::var("USERPROFILE"))
-            .ok();
-        let cwd = match home.and_then(|h| cwd_path.strip_prefix(Path::new(&h)).ok()) {
-            Some(rest) => format!("~/{}", rest.display()),
-            None => cwd_path.display().to_string(),
-        };
+        let cwd_path = std::env::current_dir()
+            .map(|p| p.display().to_string())
+            .unwrap_or_else(|_| String::from("."));
+        let cwd = replace_homedir::replace_homedir(&cwd_path, "~");
         Self {
             logo: Logo::new(),
             menu: Menu::new(),
@@ -150,7 +143,7 @@ impl App {
         );
 
         let [body, footer_area] =
-            Layout::vertical([Constraint::Fill(1), Constraint::Length(1)]).areas(area);
+            Layout::vertical([Constraint::Fill(1), Constraint::Length(2)]).areas(area);
 
         let [_, logo_area, _, menu_area, hint_area, _] = Layout::vertical([
             Constraint::Fill(1),

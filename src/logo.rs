@@ -1,4 +1,4 @@
-//! ASCII 艺术字 logo 模块。
+//! ASCII Logo 模块。
 
 use ratatui::{
     Frame,
@@ -24,14 +24,13 @@ const EXCEL_ART: [&str; 4] = [
     "▀▀▀▀ ▀  ▀ ▀▀▀▀ ▀▀▀▀ ▀▀",
 ];
 
-/// logo ASCII 艺术字的高度（行数）。
+/// Logo 高度。
 pub const LOGO_HEIGHT: u16 = {
     let m = MINI_ART.len();
     let e = EXCEL_ART.len();
     if m > e { m } else { e }
 } as u16;
 
-/// 居中渲染 "miniExcel" ASCII 艺术字 logo 的组件。
 pub struct Logo;
 
 impl Logo {

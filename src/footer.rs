@@ -7,7 +7,7 @@ use ratatui::{
     layout::{Constraint, Layout, Rect},
     style::{Color, Style},
     text::Line,
-    widgets::Paragraph,
+    widgets::{Block, Padding, Paragraph},
 };
 
 /// 底栏文字颜色。
@@ -30,11 +30,13 @@ impl Footer {
 
     /// 在终端底部渲染底栏。
     pub fn render(&self, frame: &mut Frame, area: Rect) {
+        let block = Block::new().padding(Padding::new(2, 2, 0, 1));
+
         let [path_area, version_area] = Layout::horizontal([
             Constraint::Fill(1),
             Constraint::Length(self.version.len() as u16),
         ])
-        .areas(area);
+        .areas(block.inner(area));
 
         let footer_style = Style::default().fg(FOOTER_COLOR);
 
