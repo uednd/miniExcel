@@ -9,6 +9,7 @@ mod logo;
 mod menu;
 mod menu_screen;
 mod screen;
+mod theme;
 
 fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;

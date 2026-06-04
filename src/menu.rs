@@ -7,17 +7,12 @@
 use ratatui::{
     Frame,
     layout::{Constraint, Layout, Rect},
-    style::{Color, Modifier, Style},
+    style::{Modifier, Style},
     text::Line,
     widgets::Paragraph,
 };
 
-/// 选中项背景色。
-const THEME_GREEN: Color = Color::Rgb(80, 160, 100);
-/// 选中项文字色。
-const SELECTED_TEXT: Color = Color::Rgb(16, 32, 22);
-/// 未选中项文字色。
-const UNSELECTED_TEXT: Color = Color::Rgb(160, 160, 160);
+use crate::theme::{TEXT_HIGHLIGHT, TEXT_SELECTED, THEME_GREEN};
 
 /// 菜单动作。
 pub enum MenuAction {
@@ -68,10 +63,10 @@ impl Menu {
             Layout::horizontal([Constraint::Fill(1); MENU_ENTRIES.len()]).areas(menu_area);
 
         let selected_style = Style::default()
-            .fg(SELECTED_TEXT)
+            .fg(TEXT_SELECTED)
             .bg(THEME_GREEN)
             .add_modifier(Modifier::BOLD);
-        let unselected_style = Style::default().fg(UNSELECTED_TEXT);
+        let unselected_style = Style::default().fg(TEXT_HIGHLIGHT);
 
         for (i, (label, _)) in MENU_ENTRIES.iter().enumerate() {
             let style = if i == self.selected {

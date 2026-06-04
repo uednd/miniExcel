@@ -3,12 +3,13 @@
 use ratatui::{
     Frame,
     layout::{Constraint, Rect},
-    style::{Color, Style},
+    style::Style,
     text::{Line, Span, Text},
     widgets::Paragraph,
 };
 
-const MINI_COLOR: Color = Color::Rgb(135, 142, 142);
+use crate::theme::{LOGO_EXCEL, LOGO_MINI};
+
 const MINI_ART: [&str; 4] = [
     "      ▄      ▄ ",
     "▄▄▄▄  ▄ ▄▄▄  ▄ ",
@@ -16,7 +17,6 @@ const MINI_ART: [&str; 4] = [
     "▀ ▀ ▀ ▀ ▀  ▀ ▀ ",
 ];
 
-const EXCEL_COLOR: Color = Color::Rgb(220, 224, 224);
 const EXCEL_ART: [&str; 4] = [
     "▄▄▄▄                █ ",
     "█▄▄▄ ▄  ▄ █▀▀▀ █▀▀█ █ ",
@@ -44,8 +44,8 @@ impl Logo {
             .zip(EXCEL_ART)
             .map(|(mini, excel)| {
                 Line::from(vec![
-                    Span::styled(mini, Style::default().fg(MINI_COLOR)),
-                    Span::styled(excel, Style::default().fg(EXCEL_COLOR)),
+                    Span::styled(mini, Style::default().fg(LOGO_MINI)),
+                    Span::styled(excel, Style::default().fg(LOGO_EXCEL)),
                 ])
             })
             .collect();
