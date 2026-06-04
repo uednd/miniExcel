@@ -1,7 +1,8 @@
 //! 主菜单/导航入口渲染模块。
 //!
 //! 横向排列「新建表格」「最近使用」「设置」三个入口，
-//! 通过样式变化标识当前选中项。
+//! 通过样式变化标识当前选中项。每个入口关联一个 `MenuAction`，
+//! 调用方通过 `selected_action()` 获取当前选中项的动作语义。
 
 use ratatui::{
     Frame,
@@ -17,8 +18,20 @@ const THEME_GREEN: Color = Color::Rgb(80, 160, 100);
 const SELECTED_TEXT: Color = Color::Rgb(16, 32, 22);
 /// 未选中项文字色。
 const UNSELECTED_TEXT: Color = Color::Rgb(160, 160, 160);
-/// 菜单项标签。
-const MENU_ITEMS: [&str; 3] = ["新建表格", "最近打开", "设置"];
+
+/// 菜单动作。
+pub enum MenuAction {
+    NewTable,
+    Recent,
+    Settings,
+}
+
+/// 菜单项：(标签, 动作)。
+const MENU_ENTRIES: [(&str, MenuAction); 3] = [
+    ("新建表格", MenuAction::NewTable),
+    ("最近打开", MenuAction::Recent),
+    ("设置", MenuAction::Settings),
+];
 
 /// 菜单选中状态。
 pub struct Menu {
@@ -38,16 +51,21 @@ impl Menu {
 
     /// 向右移动选中项（`→`）。
     pub fn move_right(&mut self) {
-        if self.selected + 1 < MENU_ITEMS.len() {
+        if self.selected + 1 < MENU_ENTRIES.len() {
             self.selected += 1;
         }
+    }
+
+    /// 返回当前选中项对应的动作。
+    pub fn selected_action(&self) -> &MenuAction {
+        &MENU_ENTRIES[self.selected].1
     }
 
     /// 在给定区域内居中渲染横向菜单。
     pub fn render(&self, frame: &mut Frame, area: Rect) {
         let menu_area = area.centered_horizontally(Constraint::Percentage(50));
-        let chunks: [Rect; MENU_ITEMS.len()] =
-            Layout::horizontal([Constraint::Fill(1); MENU_ITEMS.len()]).areas(menu_area);
+        let chunks: [Rect; MENU_ENTRIES.len()] =
+            Layout::horizontal([Constraint::Fill(1); MENU_ENTRIES.len()]).areas(menu_area);
 
         let selected_style = Style::default()
             .fg(SELECTED_TEXT)
@@ -55,7 +73,7 @@ impl Menu {
             .add_modifier(Modifier::BOLD);
         let unselected_style = Style::default().fg(UNSELECTED_TEXT);
 
-        for (i, label) in MENU_ITEMS.iter().enumerate() {
+        for (i, (label, _)) in MENU_ENTRIES.iter().enumerate() {
             let style = if i == self.selected {
                 selected_style
             } else {
