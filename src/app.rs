@@ -2,7 +2,7 @@
 //!
 //! 包含主事件循环、键盘事件分发及各 UI 组件的渲染调度。
 
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
 use ratatui::{
@@ -14,27 +14,19 @@ use ratatui::{
     widgets::Paragraph,
 };
 
-use crate::{footer::Footer, logo::LOGO_HEIGHT, logo::Logo, menu::Menu};
+use crate::{exit_handler::ExitHandler, footer::Footer, logo::LOGO_HEIGHT, logo::Logo, menu::Menu};
 
 const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
-const EXIT_CONFIRM_TIMEOUT: Duration = Duration::from_secs(1);
 
 /// logo 到菜单的间距。
 const LOGO_MENU_GAP: u16 = 2;
 
-#[derive(Debug)]
-enum ExitState {
-    Idle,
-    ConfirmOnce(Instant),
-    Confirmed,
-}
-
-/// 应用全局状态，持有各 UI 组件及退出状态。
+/// 应用全局状态，持有各 UI 组件。
 pub struct App {
     logo: Logo,
     menu: Menu,
     footer: Footer,
-    exit_state: ExitState,
+    exit_handler: ExitHandler,
 }
 
 impl App {
@@ -48,7 +40,7 @@ impl App {
             logo: Logo::new(),
             menu: Menu::new(),
             footer: Footer::new(cwd, APP_VERSION.to_string()),
-            exit_state: ExitState::Idle,
+            exit_handler: ExitHandler::new(Duration::from_secs(1)),
         }
     }
 
@@ -57,31 +49,15 @@ impl App {
     /// 每次迭代渲染界面并监听键盘事件。`←/→` 切换菜单选中项，1 秒内连按两次 `Ctrl+C` 退出程序。
     pub fn run(&mut self, terminal: &mut DefaultTerminal) -> std::io::Result<()> {
         loop {
-            // 连续按两次 => 退出程序
-            if matches!(self.exit_state, ExitState::Confirmed) {
+            if self.exit_handler.should_exit() {
                 return Ok(());
             }
 
-            // 按一次 && 超时 => 退出状态改为空闲
-            if let ExitState::ConfirmOnce(first) = self.exit_state
-                && first.elapsed() >= EXIT_CONFIRM_TIMEOUT
-            {
-                self.exit_state = ExitState::Idle;
-            }
+            self.exit_handler.tick();
 
-            // 绘制界面
             terminal.draw(|frame| self.render(frame))?;
 
-            // 按一次
-            let timeout = match self.exit_state {
-                ExitState::Idle | ExitState::Confirmed => Duration::from_millis(100),
-                ExitState::ConfirmOnce(first) => {
-                    EXIT_CONFIRM_TIMEOUT.saturating_sub(first.elapsed())
-                }
-            };
-
-            // 按一次 && 超时 => 重新绘制界面
-            if !event::poll(timeout)? {
+            if !event::poll(self.exit_handler.poll_timeout())? {
                 continue;
             }
 
@@ -99,34 +75,20 @@ impl App {
         match key.code {
             KeyCode::Left => {
                 self.menu.move_left();
-                self.exit_state = ExitState::Idle;
+                self.exit_handler.reset();
             }
             KeyCode::Right => {
                 self.menu.move_right();
-                self.exit_state = ExitState::Idle;
+                self.exit_handler.reset();
             }
             KeyCode::Enter => {
                 todo!();
             }
             KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
-                let now = Instant::now();
-                match self.exit_state {
-                    ExitState::Idle => {
-                        self.exit_state = ExitState::ConfirmOnce(now);
-                    }
-                    ExitState::ConfirmOnce(first)
-                        if now.duration_since(first) < EXIT_CONFIRM_TIMEOUT =>
-                    {
-                        self.exit_state = ExitState::Confirmed;
-                    }
-                    ExitState::ConfirmOnce(_) => {
-                        self.exit_state = ExitState::ConfirmOnce(now);
-                    }
-                    ExitState::Confirmed => {}
-                }
+                self.exit_handler.press_ctrl_c();
             }
             KeyCode::Char(_) => {
-                self.exit_state = ExitState::Idle;
+                self.exit_handler.reset();
             }
             _ => {}
         }
@@ -159,12 +121,9 @@ impl App {
         self.menu.render(frame, menu_area);
         self.footer.render(frame, footer_area);
 
-        if let ExitState::ConfirmOnce(_) = self.exit_state {
+        if let Some(hint) = self.exit_handler.hint_text() {
             frame.render_widget(
-                Paragraph::new("再次按下 Ctrl+C 以退出")
-                    .centered()
-                    .yellow()
-                    .bold(),
+                Paragraph::new(hint).centered().yellow().bold(),
                 hint_area,
             );
         }
