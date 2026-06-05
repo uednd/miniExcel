@@ -1,16 +1,39 @@
 use ratatui::style::Color;
 
-/// 主题色
-pub const THEME_GREEN: Color = Color::Rgb(80, 160, 100);
+#[derive(Clone, Copy)]
+pub struct Theme {
+    /// 全局背景色。
+    pub bg: Color,
+    /// 内容面板背景色。
+    pub surface: Color,
+    /// 标签栏背景色。
+    pub surface_alt: Color,
+    /// 主题色（强调色）。
+    pub accent: Color,
+    /// 主题色上的文字色（选中态）。
+    pub accent_text: Color,
+    /// 高亮文本。
+    pub text: Color,
+    /// 普通/次要文本。
+    pub text_dim: Color,
+    /// Logo 浅色部分。
+    pub logo_light: Color,
+    /// Logo 亮色部分。
+    pub logo_bright: Color,
+}
 
-/// 文本选中态
-pub const TEXT_SELECTED: Color = Color::Rgb(16, 32, 22);
-
-/// 普通文本
-pub const TEXT_DIM: Color = Color::Rgb(150, 150, 150);
-
-/// 高亮文本
-pub const TEXT_HIGHLIGHT: Color = Color::Rgb(240, 240, 240);
-
-pub const LOGO_MINI: Color = Color::Rgb(135, 142, 142);
-pub const LOGO_EXCEL: Color = Color::Rgb(220, 224, 224);
+impl Theme {
+    pub fn dark() -> Self {
+        Self {
+            bg: Color::Rgb(10, 10, 10),
+            surface: Color::Rgb(28, 28, 28),
+            surface_alt: Color::Rgb(18, 18, 18),
+            accent: Color::Rgb(80, 160, 100),
+            accent_text: Color::Rgb(16, 32, 22),
+            text: Color::Rgb(240, 240, 240),
+            text_dim: Color::Rgb(150, 150, 150),
+            logo_light: Color::Rgb(135, 142, 142),
+            logo_bright: Color::Rgb(220, 224, 224),
+        }
+    }
+}

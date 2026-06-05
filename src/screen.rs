@@ -17,10 +17,7 @@ pub enum ScreenCommand {
 /// 每个画面封装自己的布局、子组件、按键响应。
 pub trait Screen {
     /// 在 `area` 区域内渲染当前画面。
-    ///
-    /// `hint` 为应用级提示文字（如退出确认文案），
-    /// 画面自行决定是否以及何处渲染。
-    fn render(&self, frame: &mut Frame, area: Rect, hint: Option<&str>);
+    fn render(&self, frame: &mut Frame, area: Rect);
 
     /// 处理按键。
     ///

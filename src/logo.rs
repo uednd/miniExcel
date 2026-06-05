@@ -1,5 +1,3 @@
-//! ASCII Logo 模块。
-
 use ratatui::{
     Frame,
     layout::{Constraint, Rect},
@@ -8,7 +6,7 @@ use ratatui::{
     widgets::Paragraph,
 };
 
-use crate::theme::{LOGO_EXCEL, LOGO_MINI};
+use crate::theme::Theme;
 
 const MINI_ART: [&str; 4] = [
     "      ▄      ▄ ",
@@ -24,18 +22,19 @@ const EXCEL_ART: [&str; 4] = [
     "▀▀▀▀ ▀  ▀ ▀▀▀▀ ▀▀▀▀ ▀▀",
 ];
 
-/// Logo 高度。
 pub const LOGO_HEIGHT: u16 = {
     let m = MINI_ART.len();
     let e = EXCEL_ART.len();
     if m > e { m } else { e }
 } as u16;
 
-pub struct Logo;
+pub struct Logo {
+    theme: Theme,
+}
 
 impl Logo {
-    pub fn new() -> Self {
-        Self
+    pub fn new(theme: Theme) -> Self {
+        Self { theme }
     }
 
     pub fn render(&self, frame: &mut Frame, area: Rect) {
@@ -44,8 +43,8 @@ impl Logo {
             .zip(EXCEL_ART)
             .map(|(mini, excel)| {
                 Line::from(vec![
-                    Span::styled(mini, Style::default().fg(LOGO_MINI)),
-                    Span::styled(excel, Style::default().fg(LOGO_EXCEL)),
+                    Span::styled(mini, Style::default().fg(self.theme.logo_light)),
+                    Span::styled(excel, Style::default().fg(self.theme.logo_bright)),
                 ])
             })
             .collect();

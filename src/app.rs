@@ -1,14 +1,10 @@
-//! App 状态管理与事件循环。
-//!
-//! 包含主事件循环、键盘事件分发、全局元素渲染。
-
 use std::time::Duration;
 
 use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
 use ratatui::{
     DefaultTerminal,
     layout::{Constraint, Layout},
-    style::{Color, Style},
+    style::Style,
     widgets::Block,
 };
 
@@ -17,12 +13,13 @@ use crate::{
     footer::Footer,
     menu_screen::MenuScreen,
     screen::{Screen, ScreenCommand},
+    theme::Theme,
 };
 
 const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-/// 应用全局状态。
 pub struct App {
+    theme: Theme,
     active_screen: Box<dyn Screen>,
     exit_handler: ExitHandler,
     footer: Footer,
@@ -34,17 +31,16 @@ impl App {
             .map(|p| p.display().to_string())
             .unwrap_or_else(|_| String::from("."));
         let cwd = replace_homedir::replace_homedir(&full_cwd, "~");
+        let theme = Theme::dark();
 
         Self {
-            active_screen: Box::new(MenuScreen::new()),
+            theme,
+            active_screen: Box::new(MenuScreen::new(theme)),
             exit_handler: ExitHandler::new(Duration::from_secs(1)),
-            footer: Footer::new(cwd, APP_VERSION.to_string()),
+            footer: Footer::new(cwd, APP_VERSION.to_string(), theme),
         }
     }
 
-    /// 运行主事件循环。
-    ///
-    /// 每次迭代渲染当前画面并监听键盘事件。1 秒内连按两次 `Ctrl+C` 退出程序。
     pub fn run(&mut self, terminal: &mut DefaultTerminal) -> std::io::Result<()> {
         loop {
             if self.exit_handler.should_exit() {
@@ -58,17 +54,16 @@ impl App {
             terminal.draw(|frame| {
                 let area = frame.area();
 
-                // 黑色背景
                 frame.render_widget(
-                    Block::new().style(Style::default().bg(Color::Rgb(10, 10, 10))),
+                    Block::new().style(Style::default().bg(self.theme.bg)),
                     area,
                 );
 
                 let [body, footer_area] =
                     Layout::vertical([Constraint::Fill(1), Constraint::Length(2)]).areas(area);
 
-                self.active_screen.render(frame, body, hint);
-                self.footer.render(frame, footer_area);
+                self.active_screen.render(frame, body);
+                self.footer.render(frame, footer_area, hint);
             })?;
 
             if !event::poll(self.exit_handler.poll_timeout())? {
@@ -82,9 +77,6 @@ impl App {
         }
     }
 
-    /// 分发键盘事件。
-    ///
-    /// Ctrl+C 由 App 拦截以保证全局行为一致，其余按键委托给当前画面。
     fn dispatch_key(&mut self, key: crossterm::event::KeyEvent) {
         if key.code == KeyCode::Char('c') && key.modifiers.contains(KeyModifiers::CONTROL) {
             self.exit_handler.press_ctrl_c();
