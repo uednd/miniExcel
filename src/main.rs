@@ -3,14 +3,10 @@
 //! 按两次 Ctrl+C 退出。
 
 mod app;
-mod exit_handler;
-mod footer;
-mod input;
-mod logo;
-mod menu_screen;
+mod exit;
 mod screen;
-mod tabs;
 mod theme;
+mod widget;
 
 fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;

@@ -47,33 +47,33 @@ impl Footer {
             Span::styled(" 切换标签", dim_style),
         ]);
 
+        // Cwd
         frame.render_widget(
             Paragraph::new(Line::from(self.current_dir.as_str()).style(dim_style)),
             path_area,
         );
+
+        // Tip
         frame.render_widget(Paragraph::new(hint).alignment(Alignment::Center), hint_area);
 
-        if let Some(text) = exit_hint {
-            let exit_width = text.width() as u16 + 2;
-            let [exit_hint_area, version_text_area] =
-                Layout::horizontal([Constraint::Length(exit_width), Constraint::Fill(1)])
-                    .areas(version_area);
+        // Exit hint
+        let exit_width = exit_hint.map_or(0, |t| t.width() as u16 + 2);
+        let [exit_hint_area, version_text_area] =
+            Layout::horizontal([Constraint::Length(exit_width), Constraint::Fill(1)])
+                .areas(version_area);
 
+        if let Some(text) = exit_hint {
             frame.render_widget(
                 Paragraph::new(Line::from(text)).yellow().bold(),
                 exit_hint_area,
             );
-            frame.render_widget(
-                Paragraph::new(Line::from(self.version.as_str()).style(dim_style))
-                    .alignment(Alignment::Right),
-                version_text_area,
-            );
-        } else {
-            frame.render_widget(
-                Paragraph::new(Line::from(self.version.as_str()).style(dim_style))
-                    .alignment(Alignment::Right),
-                version_area,
-            );
         }
+
+        // Version
+        frame.render_widget(
+            Paragraph::new(Line::from(self.version.as_str()).style(dim_style))
+                .alignment(Alignment::Right),
+            version_text_area,
+        );
     }
 }

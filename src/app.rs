@@ -9,11 +9,10 @@ use ratatui::{
 };
 
 use crate::{
-    exit_handler::ExitHandler,
-    footer::Footer,
-    menu_screen::MenuScreen,
-    screen::{Screen, ScreenCommand},
+    exit::ExitHandler,
+    screen::{Screen, ScreenCommand, home::MenuScreen},
     theme::Theme,
+    widget::footer::Footer,
 };
 
 const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -54,10 +53,7 @@ impl App {
             terminal.draw(|frame| {
                 let area = frame.area();
 
-                frame.render_widget(
-                    Block::new().style(Style::default().bg(self.theme.bg)),
-                    area,
-                );
+                frame.render_widget(Block::new().style(Style::default().bg(self.theme.bg)), area);
 
                 let [body, footer_area] =
                     Layout::vertical([Constraint::Fill(1), Constraint::Length(2)]).areas(area);
