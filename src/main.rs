@@ -5,10 +5,11 @@
 mod app;
 mod exit_handler;
 mod footer;
+mod input;
 mod logo;
-mod menu;
 mod menu_screen;
 mod screen;
+mod tabs;
 mod theme;
 
 fn main() -> color_eyre::Result<()> {
