@@ -4,14 +4,12 @@
 
 use std::time::{Duration, Instant};
 
-/// 退出状态机内部状态。
 enum State {
     Idle,
     ConfirmOnce(Instant),
     Confirmed,
 }
 
-/// 退出确认处理器。
 pub struct ExitHandler {
     state: State,
     timeout: Duration,
@@ -25,7 +23,6 @@ impl ExitHandler {
         }
     }
 
-    /// 处理 Ctrl+C 按键，进行状态转移。
     pub fn press_ctrl_c(&mut self) {
         let now = Instant::now();
         self.state = match self.state {
@@ -68,7 +65,6 @@ impl ExitHandler {
         }
     }
 
-    /// 提示文案。
     pub fn hint_text(&self) -> Option<&'static str> {
         if matches!(self.state, State::ConfirmOnce(_)) {
             Some("再次按下 Ctrl+C 以退出")

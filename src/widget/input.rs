@@ -49,7 +49,7 @@ impl Input {
         };
 
         let mut spans = vec![label, value_span];
-        
+
         if cursor {
             spans.push(Span::styled("█", Style::default().fg(self.theme.text)));
         }

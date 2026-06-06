@@ -2,6 +2,8 @@ use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
     Frame,
     layout::{Constraint, Layout, Rect},
+    style::Style,
+    text::{Line, Span},
 };
 
 use crate::{
@@ -15,6 +17,7 @@ use crate::{
 use super::{Screen, ScreenCommand};
 
 pub struct MenuScreen {
+    theme: Theme,
     logo: Logo,
     tabs: Tabs,
 }
@@ -22,6 +25,7 @@ pub struct MenuScreen {
 impl MenuScreen {
     pub fn new(theme: Theme) -> Self {
         Self {
+            theme,
             logo: Logo::new(theme),
             tabs: Tabs::new(theme),
         }
@@ -49,5 +53,14 @@ impl Screen for MenuScreen {
             _ if self.tabs.handle_key(key) => Some(ScreenCommand::Stay),
             _ => Some(ScreenCommand::Stay),
         }
+    }
+
+    fn footer_hint(&self) -> Option<Line<'static>> {
+        Some(Line::from(vec![
+            Span::styled("● 提示", Style::default().fg(self.theme.accent)),
+            Span::styled(" 使用 ", Style::default().fg(self.theme.text_dim)),
+            Span::styled("←/→", Style::default().fg(self.theme.text)),
+            Span::styled(" 切换标签", Style::default().fg(self.theme.text_dim)),
+        ]))
     }
 }

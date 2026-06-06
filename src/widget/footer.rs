@@ -4,7 +4,7 @@ use ratatui::{
     Frame,
     layout::{Alignment, Constraint, Layout, Rect},
     style::{Style, Stylize},
-    text::{Line, Span},
+    text::Line,
     widgets::{Block, Padding, Paragraph},
 };
 
@@ -25,7 +25,13 @@ impl Footer {
         }
     }
 
-    pub fn render(&self, frame: &mut Frame, area: Rect, exit_hint: Option<&str>) {
+    pub fn render(
+        &self,
+        frame: &mut Frame,
+        area: Rect,
+        tip_hint: Option<Line<'_>>,
+        exit_hint: Option<&str>,
+    ) {
         let block = Block::new().padding(Padding::new(2, 2, 0, 1));
         let inner = block.inner(area);
 
@@ -37,24 +43,17 @@ impl Footer {
         .areas(inner);
 
         let dim_style = Style::default().fg(self.theme.text_dim);
-        let accent_style = Style::default().fg(self.theme.accent);
-        let highlight_style = Style::default().fg(self.theme.text);
 
-        let hint = Line::from(vec![
-            Span::styled("● 提示", accent_style),
-            Span::styled(" 使用 ", dim_style),
-            Span::styled("←/→", highlight_style),
-            Span::styled(" 切换标签", dim_style),
-        ]);
-
-        // Cwd
+        // CWD
         frame.render_widget(
             Paragraph::new(Line::from(self.current_dir.as_str()).style(dim_style)),
             path_area,
         );
 
-        // Tip
-        frame.render_widget(Paragraph::new(hint).alignment(Alignment::Center), hint_area);
+        // Tip hint
+        if let Some(hint) = tip_hint {
+            frame.render_widget(Paragraph::new(hint).alignment(Alignment::Center), hint_area);
+        }
 
         // Exit hint
         let exit_width = exit_hint.map_or(0, |t| t.width() as u16 + 2);
