@@ -1,12 +1,13 @@
+pub mod editor;
 pub mod home;
 
-use crossterm::event::KeyEvent;
+use crossterm::event::{KeyEvent, MouseEvent};
 use ratatui::{Frame, layout::Rect, text::Line};
 
-#[allow(dead_code)]
 pub enum ScreenCommand {
     Stay,
-    Navigate(Box<dyn Screen>),
+    OpenEditor { path: String },
+    GoHome,
 }
 
 pub trait Screen {
@@ -14,7 +15,15 @@ pub trait Screen {
 
     fn handle_key(&mut self, key: KeyEvent) -> Option<ScreenCommand>;
 
+    fn handle_scroll(&mut self, _event: MouseEvent) -> Option<ScreenCommand> {
+        None
+    }
+
     fn footer_hint(&self) -> Option<Line<'static>> {
+        None
+    }
+
+    fn footer_status(&self) -> Option<Line<'static>> {
         None
     }
 }
