@@ -1,4 +1,4 @@
-use crossterm::event::{KeyCode, KeyEvent};
+use crossterm::event::KeyEvent;
 use ratatui::{
     Frame,
     layout::{Constraint, Layout, Rect},
@@ -7,10 +7,11 @@ use ratatui::{
 };
 
 use crate::{
+    model::workbook::Workbook,
     theme::Theme,
     widget::{
         logo::{LOGO_HEIGHT, Logo},
-        tabs::Tabs,
+        tabs::{TabAction, Tabs},
     },
 };
 
@@ -18,14 +19,16 @@ use super::{Screen, ScreenCommand};
 
 pub struct MenuScreen {
     theme: Theme,
+    cwd: String,
     logo: Logo,
     tabs: Tabs,
 }
 
 impl MenuScreen {
-    pub fn new(theme: Theme) -> Self {
+    pub fn new(theme: Theme, cwd: String) -> Self {
         Self {
             theme,
+            cwd,
             logo: Logo::new(theme),
             tabs: Tabs::new(theme),
         }
@@ -48,10 +51,18 @@ impl Screen for MenuScreen {
     }
 
     fn handle_key(&mut self, key: KeyEvent) -> Option<ScreenCommand> {
-        match key.code {
-            KeyCode::Enter => Some(ScreenCommand::Stay),
-            _ if self.tabs.handle_key(key) => Some(ScreenCommand::Stay),
-            _ => Some(ScreenCommand::Stay),
+        match self.tabs.handle_key(key) {
+            Some(TabAction::Handled) => Some(ScreenCommand::Stay),
+            Some(TabAction::CreateTable(name)) => {
+                let path = format!("{}/{}.mxlsx", self.cwd, name);
+                let wb = Workbook::new(name, 26, 100);
+                if wb.save(&path).is_ok() {
+                    Some(ScreenCommand::OpenEditor { path })
+                } else {
+                    Some(ScreenCommand::Stay)
+                }
+            }
+            None => Some(ScreenCommand::Stay),
         }
     }
 
@@ -59,7 +70,7 @@ impl Screen for MenuScreen {
         Some(Line::from(vec![
             Span::styled("● 提示", Style::default().fg(self.theme.accent)),
             Span::styled(" 使用 ", Style::default().fg(self.theme.text_dim)),
-            Span::styled("←/→", Style::default().fg(self.theme.text)),
+            Span::styled("Tab", Style::default().fg(self.theme.text)),
             Span::styled(" 切换标签", Style::default().fg(self.theme.text_dim)),
         ]))
     }

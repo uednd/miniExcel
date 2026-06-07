@@ -4,6 +4,7 @@
 
 mod app;
 mod exit;
+mod model;
 mod screen;
 mod theme;
 mod widget;
@@ -11,6 +12,11 @@ mod widget;
 fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
     let mut app = app::App::new();
-    ratatui::run(|terminal| app.run(terminal))?;
+    ratatui::run(|terminal| {
+        crossterm::execute!(std::io::stdout(), crossterm::event::EnableMouseCapture)?;
+        let result = app.run(terminal);
+        crossterm::execute!(std::io::stdout(), crossterm::event::DisableMouseCapture)?;
+        result
+    })?;
     Ok(())
 }

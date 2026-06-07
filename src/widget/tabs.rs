@@ -9,6 +9,12 @@ use ratatui::{
 
 use crate::{theme::Theme, widget::input::Input};
 
+#[derive(Debug, PartialEq, Eq)]
+pub enum TabAction {
+    Handled, // 内部已处理，无需调用方
+    CreateTable(String),
+}
+
 pub enum TabPage {
     Recent(&'static str),
     NewTable(&'static str, Input),
@@ -34,14 +40,8 @@ impl Tabs {
         }
     }
 
-    pub fn prev(&mut self) {
-        self.selected = self.selected.saturating_sub(1);
-    }
-
     pub fn next(&mut self) {
-        if self.selected + 1 < self.pages.len() {
-            self.selected += 1;
-        }
+        self.selected = (self.selected + 1) % self.pages.len();
     }
 
     pub fn render(&self, frame: &mut Frame, area: Rect) {
@@ -52,7 +52,6 @@ impl Tabs {
         ])
         .areas(area);
 
-        // Tab bar
         let [tab_bar_area, tab_content_area] =
             Layout::vertical([Constraint::Length(1), Constraint::Fill(1)]).areas(centered[1]);
 
@@ -62,7 +61,6 @@ impl Tabs {
         );
         self.render_tab_bar(frame, tab_bar_area);
 
-        // Tab content
         frame.render_widget(
             Block::default().style(Style::default().bg(self.theme.surface)),
             tab_content_area,
@@ -70,15 +68,11 @@ impl Tabs {
         self.pages[self.selected].render(frame, tab_content_area, self.theme);
     }
 
-    pub fn handle_key(&mut self, key: KeyEvent) -> bool {
+    pub fn handle_key(&mut self, key: KeyEvent) -> Option<TabAction> {
         match key.code {
-            KeyCode::Left => {
-                self.prev();
-                true
-            }
-            KeyCode::Right => {
+            KeyCode::Tab => {
                 self.next();
-                true
+                Some(TabAction::Handled)
             }
             // 由当前 Tab content 处理
             _ => self.pages[self.selected].handle_key(key),
@@ -168,21 +162,37 @@ impl TabPage {
         }
     }
 
-    fn handle_key(&mut self, key: KeyEvent) -> bool {
+    fn handle_key(&mut self, key: KeyEvent) -> Option<TabAction> {
         match self {
             TabPage::NewTable(_, input) => match key.code {
+                KeyCode::Enter => {
+                    let name = table_name(input);
+                    Some(TabAction::CreateTable(name))
+                }
                 KeyCode::Backspace => {
                     input.delete_char();
-                    true
+                    Some(TabAction::Handled)
                 }
-                // 用户的输入字符
                 KeyCode::Char(c) => {
                     input.insert_char(c);
-                    true
+                    Some(TabAction::Handled)
                 }
-                _ => false,
+                _ => None,
             },
-            _ => false,
+            _ => None,
         }
+    }
+}
+
+fn table_name(input: &Input) -> String {
+    let name = input.buffer();
+    if name.is_empty() {
+        let ts = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs();
+        format!("表格_{}", ts)
+    } else {
+        name.to_string()
     }
 }

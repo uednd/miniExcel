@@ -5,6 +5,7 @@ use ratatui::{
     text::{Line, Span},
     widgets::Paragraph,
 };
+use unicode_width::UnicodeWidthStr;
 
 use crate::theme::Theme;
 
@@ -34,26 +35,20 @@ impl Input {
     }
 
     pub fn render(&self, frame: &mut Frame, area: Rect) {
-        let label = Span::styled("表格名称  ", Style::default().fg(self.theme.accent));
+        let label_text = "表格名称  ";
+        let label = Span::styled(label_text, Style::default().fg(self.theme.accent));
 
-        let (value_span, cursor) = if self.buffer.is_empty() {
-            (
-                Span::styled("输入表格名称...", Style::default().fg(self.theme.text_dim)),
-                false,
-            )
+        let value_span = if self.buffer.is_empty() {
+            Span::styled("输入表格名称...", Style::default().fg(self.theme.text_dim))
         } else {
-            (
-                Span::styled(&self.buffer, Style::default().fg(self.theme.text)),
-                true,
-            )
+            Span::styled(&self.buffer, Style::default().fg(self.theme.text))
         };
 
-        let mut spans = vec![label, value_span];
+        frame.render_widget(Paragraph::new(Line::from(vec![label, value_span])), area);
 
-        if cursor {
-            spans.push(Span::styled("█", Style::default().fg(self.theme.text)));
-        }
-
-        frame.render_widget(Paragraph::new(Line::from(spans)), area);
+        frame.set_cursor_position((
+            area.x + label_text.width() as u16 + self.buffer.as_str().width() as u16,
+            area.y,
+        ));
     }
 }

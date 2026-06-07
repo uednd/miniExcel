@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
+use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers, MouseEventKind};
 use ratatui::{
     DefaultTerminal,
     layout::{Constraint, Layout},
@@ -19,6 +19,7 @@ const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 pub struct App {
     theme: Theme,
+    cwd: String,
     active_screen: Box<dyn Screen>,
     exit_handler: ExitHandler,
     footer: Footer,
@@ -29,18 +30,20 @@ impl App {
         let full_cwd = std::env::current_dir()
             .map(|p| p.display().to_string())
             .unwrap_or_else(|_| String::from("."));
-        let cwd = replace_homedir::replace_homedir(&full_cwd, "~");
+        let display_cwd = replace_homedir::replace_homedir(&full_cwd, "~");
         let theme = Theme::dark();
 
         Self {
             theme,
-            active_screen: Box::new(MenuScreen::new(theme)),
+            cwd: full_cwd.clone(),
+            active_screen: Box::new(MenuScreen::new(theme, full_cwd)),
             exit_handler: ExitHandler::new(Duration::from_secs(1)),
-            footer: Footer::new(cwd, APP_VERSION.to_string(), theme),
+            footer: Footer::new(display_cwd, APP_VERSION.to_string(), theme),
         }
     }
 
     pub fn run(&mut self, terminal: &mut DefaultTerminal) -> std::io::Result<()> {
+        // 注意：不要改动任何主循环顺序，已经调好了，否则可能造成程序阻塞
         loop {
             if self.exit_handler.should_exit() {
                 return Ok(());
@@ -50,6 +53,7 @@ impl App {
 
             let exit_hint = self.exit_handler.hint_text();
             let tip_hint = self.active_screen.footer_hint();
+            let status_hint = self.active_screen.footer_status();
 
             terminal.draw(|frame| {
                 let area = frame.area();
@@ -61,33 +65,57 @@ impl App {
                 // Active screen
                 self.active_screen.render(frame, body);
                 // Footer
-                self.footer.render(frame, footer_area, tip_hint, exit_hint);
+                self.footer
+                    .render(frame, footer_area, status_hint, tip_hint, exit_hint);
             })?;
 
+            // 处理主循环中的输入事件
             if !event::poll(self.exit_handler.poll_timeout())? {
                 continue;
             }
-            if let Event::Key(key) = event::read()?
-                && key.kind == KeyEventKind::Press
-            {
-                self.dispatch_key(key);
+            match event::read()? {
+                Event::Key(key) if key.kind == KeyEventKind::Press => {
+                    self.dispatch_key(key);
+                }
+                Event::Mouse(mouse)
+                    if matches!(
+                        mouse.kind,
+                        MouseEventKind::ScrollUp
+                            | MouseEventKind::ScrollDown
+                            | MouseEventKind::ScrollLeft
+                            | MouseEventKind::ScrollRight
+                    ) =>
+                {
+                    if let Some(cmd) = self.active_screen.handle_scroll(mouse) {
+                        self.exit_handler.reset();
+                        self.process_cmd(cmd);
+                    }
+                }
+                _ => {}
             }
         }
     }
 
     fn dispatch_key(&mut self, key: crossterm::event::KeyEvent) {
-        // Ctrl+C
         if key.code == KeyCode::Char('c') && key.modifiers.contains(KeyModifiers::CONTROL) {
             self.exit_handler.press_ctrl_c();
             return;
         }
-
-        // 其他按键分发给当前 Screen.handle_key 处理
         if let Some(cmd) = self.active_screen.handle_key(key) {
             self.exit_handler.reset();
-            match cmd {
-                ScreenCommand::Stay => {}
-                ScreenCommand::Navigate(screen) => self.active_screen = screen,
+            self.process_cmd(cmd);
+        }
+    }
+
+    fn process_cmd(&mut self, cmd: ScreenCommand) {
+        match cmd {
+            ScreenCommand::Stay => {}
+            ScreenCommand::OpenEditor { path } => {
+                self.active_screen =
+                    Box::new(super::screen::editor::TableScreen::new(self.theme, path));
+            }
+            ScreenCommand::GoHome => {
+                self.active_screen = Box::new(MenuScreen::new(self.theme, self.cwd.clone()));
             }
         }
     }
