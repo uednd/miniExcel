@@ -8,6 +8,10 @@ pub struct Theme {
     pub surface: Color,
     /// 标签栏背景色。
     pub surface_alt: Color,
+    /// 表格网格线颜色。
+    pub grid: Color,
+    /// 表格选中行/列头背景色。
+    pub table_header_highlight_bg: Color,
     /// 主题色（强调色）。
     pub accent: Color,
     /// 主题色上的文字色（选中态）。
@@ -28,6 +32,8 @@ impl Theme {
             bg: Color::Rgb(10, 10, 10),
             surface: Color::Rgb(28, 28, 28),
             surface_alt: Color::Rgb(18, 18, 18),
+            grid: Color::Rgb(80, 80, 80),
+            table_header_highlight_bg: Color::Rgb(56, 56, 56),
             accent: Color::Rgb(80, 160, 100),
             accent_text: Color::Rgb(16, 32, 22),
             text: Color::Rgb(240, 240, 240),
