@@ -32,11 +32,7 @@ pub struct TableGridConfig<'a> {
 }
 
 impl TableGrid {
-    pub fn render(
-        frame: &mut Frame,
-        area: Rect,
-        cfg: TableGridConfig,
-    ) -> (usize, usize) {
+    pub fn render(frame: &mut Frame, area: Rect, cfg: TableGridConfig) -> (usize, usize) {
         let visible_rows = area.height.saturating_sub(2) as usize / 2;
         let visible_cols = (area.width.saturating_sub(ROW_NUM_WIDTH) / (COL_WIDTH + 1)) as usize;
 

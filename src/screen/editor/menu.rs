@@ -109,7 +109,8 @@ impl Mode for MenuMode {
             .items
             .iter()
             .map(|item| {
-                ListItem::new(Line::from(item.label())).style(Style::default().fg(ctx.theme.text_dim))
+                ListItem::new(Line::from(item.label()))
+                    .style(Style::default().fg(ctx.theme.text_dim))
             })
             .collect();
         let menu = List::new(menu_items)

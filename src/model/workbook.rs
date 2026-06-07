@@ -47,7 +47,7 @@ impl Workbook {
     }
 }
 
-/// Tuple 转 String 作为 HashMap 的 key，用于 JSON 序列化和反序列化 
+/// Tuple 转 String 作为 HashMap 的 key，用于 JSON 序列化和反序列化
 fn coord_key(coord: Coord) -> String {
     format!("{},{}", coord.0, coord.1)
 }

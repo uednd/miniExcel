@@ -7,7 +7,11 @@ mod navigation;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseEvent, MouseEventKind};
 use ratatui::{Frame, layout::Rect, style::Style, widgets::Block};
 
-use crate::{model::workbook::Workbook, theme::Theme, widget::table::{TableGrid, TableGridConfig}};
+use crate::{
+    model::workbook::Workbook,
+    theme::Theme,
+    widget::table::{TableGrid, TableGridConfig},
+};
 
 use self::{
     context::TableContext,
