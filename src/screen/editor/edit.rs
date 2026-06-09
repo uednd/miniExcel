@@ -42,7 +42,7 @@ impl Mode for EditMode {
             KeyCode::Enter => {
                 if !self.buffer.is_empty() {
                     ctx.wb.set_cell(
-                        (ctx.cursor_col, ctx.cursor_row),
+                        ctx.cursor,
                         self.buffer.clone(),
                         CellValue::Text(self.buffer.clone()),
                     );
@@ -109,7 +109,7 @@ impl Mode for EditMode {
         Some(Line::from(vec![
             Span::styled("[", Style::default().fg(ctx.theme.text_dim)),
             Span::styled(
-                crate::model::cell::display_coord(ctx.cursor_row, ctx.cursor_col),
+                ctx.cursor.display(),
                 Style::default().fg(ctx.theme.accent),
             ),
             Span::styled(", 编辑模式", Style::default().fg(ctx.theme.text_dim)),

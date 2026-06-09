@@ -26,17 +26,17 @@ impl DeleteMode {
     pub fn new() -> Self {
         let items = vec![
             SelectableItem::new("删除整行", |ctx: &mut TableContext| {
-                ctx.wb.delete_row(ctx.cursor_row);
-                if ctx.cursor_row >= ctx.wb.rows {
-                    ctx.cursor_row = ctx.wb.rows.saturating_sub(1);
+                ctx.wb.delete_row(ctx.cursor.row);
+                if ctx.cursor.row >= ctx.wb.rows {
+                    ctx.cursor.row = ctx.wb.rows.saturating_sub(1);
                 }
                 ctx.scroll_into_view();
                 ModeAction::SwitchToNavigation
             }),
             SelectableItem::new("删除整列", |ctx: &mut TableContext| {
-                ctx.wb.delete_column(ctx.cursor_col);
-                if ctx.cursor_col >= ctx.wb.columns {
-                    ctx.cursor_col = ctx.wb.columns.saturating_sub(1);
+                ctx.wb.delete_column(ctx.cursor.col);
+                if ctx.cursor.col >= ctx.wb.columns {
+                    ctx.cursor.col = ctx.wb.columns.saturating_sub(1);
                 }
                 ctx.scroll_into_view();
                 ModeAction::SwitchToNavigation
