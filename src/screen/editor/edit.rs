@@ -7,10 +7,7 @@ use ratatui::{
     widgets::Paragraph,
 };
 
-use crate::{
-    model::cell::CellValue,
-    util::cursor_span,
-};
+use crate::{model::cell::CellValue, util::cursor_span};
 
 use super::{
     context::TableContext,
@@ -43,7 +40,7 @@ impl Mode for EditMode {
             KeyCode::Enter => {
                 if !self.buffer.is_empty() {
                     ctx.wb.set_cell(
-                        ctx.cursor,
+                        ctx.viewport.cursor(),
                         self.buffer.clone(),
                         CellValue::Text(self.buffer.clone()),
                     );
@@ -107,7 +104,7 @@ impl Mode for EditMode {
             status: Some(Line::from(vec![
                 Span::styled("[", Style::default().fg(ctx.theme.text_dim)),
                 Span::styled(
-                    ctx.cursor.display(),
+                    ctx.viewport.cursor().display(),
                     Style::default().fg(ctx.theme.accent),
                 ),
                 Span::styled(", 编辑模式", Style::default().fg(ctx.theme.text_dim)),

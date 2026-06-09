@@ -27,19 +27,11 @@ impl DeleteMode {
     pub fn new() -> Self {
         let items = vec![
             SelectableItem::new("删除整行", |ctx: &mut TableContext| {
-                ctx.wb.delete_row(ctx.cursor.row);
-                if ctx.cursor.row >= ctx.wb.rows {
-                    ctx.cursor.row = ctx.wb.rows.saturating_sub(1);
-                }
-                ctx.scroll_into_view();
+                ctx.delete_current_row();
                 ModeAction::SwitchMode(Box::new(NavigationMode))
             }),
             SelectableItem::new("删除整列", |ctx: &mut TableContext| {
-                ctx.wb.delete_column(ctx.cursor.col);
-                if ctx.cursor.col >= ctx.wb.columns {
-                    ctx.cursor.col = ctx.wb.columns.saturating_sub(1);
-                }
-                ctx.scroll_into_view();
+                ctx.delete_current_column();
                 ModeAction::SwitchMode(Box::new(NavigationMode))
             }),
         ];
@@ -80,8 +72,9 @@ impl Mode for DeleteMode {
         let [table_area, panel_area] =
             Layout::horizontal([Constraint::Fill(1), Constraint::Length(PANEL_WIDTH)]).areas(area);
 
-        let panel_block =
-            Block::default().style(Style::default().bg(ctx.theme.surface_alt)).title(Line::styled("删除", Style::default().fg(ctx.theme.accent)));
+        let panel_block = Block::default()
+            .style(Style::default().bg(ctx.theme.surface_alt))
+            .title(Line::styled("删除", Style::default().fg(ctx.theme.accent)));
         let inner = panel_block.inner(panel_area);
         frame.render_widget(panel_block, panel_area);
         self.list.render(frame, inner, ctx.theme);

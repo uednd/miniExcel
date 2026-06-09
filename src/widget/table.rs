@@ -11,7 +11,7 @@ use crate::{
         cell::{CellAddress, CellValue, col_name},
         workbook::Workbook,
     },
-    screen::editor::Selection,
+    screen::editor::{Selection, Viewport},
     theme::Theme,
     util::blink_visible,
 };
@@ -25,21 +25,21 @@ pub struct TableGrid;
 
 pub struct TableGridConfig<'a> {
     pub wb: &'a Workbook,
-    pub scroll_col: usize,
-    pub scroll_row: usize,
-    pub cursor: CellAddress,
+    pub viewport: &'a Viewport,
     pub theme: Theme,
     pub edit_buffer: Option<&'a str>,
     pub selection: Option<&'a Selection>,
 }
 
 impl TableGrid {
-    pub fn render(frame: &mut Frame, area: Rect, cfg: TableGridConfig) -> (usize, usize) {
-        let visible_rows = area.height.saturating_sub(2) as usize / 2;
-        let visible_cols = (area.width.saturating_sub(ROW_NUM_WIDTH) / (COL_WIDTH + 1)) as usize;
+    pub fn render(frame: &mut Frame, area: Rect, cfg: TableGridConfig) {
+        let vp = cfg.viewport;
+        let cursor = vp.cursor();
+        let visible_rows = vp.visible_rows();
+        let visible_cols = vp.visible_cols();
 
         if visible_rows == 0 || visible_cols == 0 {
-            return (0, 0);
+            return;
         }
 
         let header_style = Style::default().fg(cfg.theme.text_dim);
@@ -57,14 +57,14 @@ impl TableGrid {
             widths.push(Constraint::Length(COL_WIDTH));
         }
 
-        let col_end = (cfg.scroll_col + visible_cols).min(cfg.wb.columns);
+        let col_end = (vp.scroll_col() + visible_cols).min(cfg.wb.columns);
 
         // 表头行
-        let mut header_cells = Vec::with_capacity(col_end.saturating_sub(cfg.scroll_col) + 1);
+        let mut header_cells = Vec::with_capacity(col_end.saturating_sub(vp.scroll_col()) + 1);
         header_cells.push(Cell::from("").style(header_style));
-        for ci in cfg.scroll_col..col_end {
+        for ci in vp.scroll_col()..col_end {
             // 光标列高亮
-            let style = if ci == cfg.cursor.col {
+            let style = if ci == cursor.col {
                 selected_header_style
             } else {
                 header_style
@@ -74,12 +74,12 @@ impl TableGrid {
             );
         }
 
-        let row_end = (cfg.scroll_row + visible_rows).min(cfg.wb.rows);
+        let row_end = (vp.scroll_row() + visible_rows).min(cfg.wb.rows);
 
         // 数据行
-        let mut rows: Vec<Row> = Vec::with_capacity(row_end.saturating_sub(cfg.scroll_row));
-        for ri in cfg.scroll_row..row_end {
-            let label_style = if ri == cfg.cursor.row {
+        let mut rows: Vec<Row> = Vec::with_capacity(row_end.saturating_sub(vp.scroll_row()));
+        for ri in vp.scroll_row()..row_end {
+            let label_style = if ri == cursor.row {
                 selected_header_style
             } else {
                 header_style
@@ -89,8 +89,8 @@ impl TableGrid {
                 Cell::from(Line::from((ri + 1).to_string()).alignment(Alignment::Right))
                     .style(label_style),
             ];
-            for ci in cfg.scroll_col..col_end {
-                let text = if ci == cfg.cursor.col && ri == cfg.cursor.row {
+            for ci in vp.scroll_col()..col_end {
+                let text = if ci == cursor.col && ri == cursor.row {
                     // 编辑模式
                     if let Some(buffer) = cfg.edit_buffer {
                         if blink_visible() {
@@ -128,42 +128,40 @@ impl TableGrid {
                 frame,
                 area,
                 sel,
-                cfg.scroll_row,
-                cfg.scroll_col,
-                (row_end - cfg.scroll_row, col_end - cfg.scroll_col),
+                vp.scroll_row(),
+                vp.scroll_col(),
+                (row_end - vp.scroll_row(), col_end - vp.scroll_col()),
                 Style::default().fg(cfg.theme.accent),
             );
         }
 
         // 绘制选中单元格高亮边框（若光标在选中行/列内则跳过，避免边框重叠）
         let overlap = match cfg.selection {
-            Some(Selection::Row(r)) => *r == cfg.cursor.row,
-            Some(Selection::Column(c)) => *c == cfg.cursor.col,
+            Some(Selection::Row(r)) => *r == cursor.row,
+            Some(Selection::Column(c)) => *c == cursor.col,
             Some(Selection::Range { anchor, cursor }) => {
                 let c1 = anchor.col.min(cursor.col);
                 let c2 = anchor.col.max(cursor.col);
                 let r1 = anchor.row.min(cursor.row);
                 let r2 = anchor.row.max(cursor.row);
-                cfg.cursor.col >= c1 && cfg.cursor.col <= c2 && cfg.cursor.row >= r1 && cfg.cursor.row <= r2
+                cursor.col >= c1 && cursor.col <= c2 && cursor.row >= r1 && cursor.row <= r2
             }
             _ => false,
         };
         if !overlap
-            && cfg.cursor.row >= cfg.scroll_row
-            && cfg.cursor.row < cfg.scroll_row + visible_rows
-            && cfg.cursor.col >= cfg.scroll_col
-            && cfg.cursor.col < cfg.scroll_col + visible_cols
+            && cursor.row >= vp.scroll_row()
+            && cursor.row < vp.scroll_row() + visible_rows
+            && cursor.col >= vp.scroll_col()
+            && cursor.col < vp.scroll_col() + visible_cols
         {
             draw_cell_border(
                 frame,
                 area,
-                cfg.cursor.row - cfg.scroll_row,
-                cfg.cursor.col - cfg.scroll_col,
+                cursor.row - vp.scroll_row(),
+                cursor.col - vp.scroll_col(),
                 Style::default().fg(cfg.theme.accent),
             );
         }
-
-        (visible_rows, visible_cols)
     }
 }
 

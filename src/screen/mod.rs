@@ -11,7 +11,7 @@ pub enum ScreenCommand {
 }
 
 pub trait Screen {
-    fn render(&self, frame: &mut Frame, area: Rect);
+    fn render(&mut self, frame: &mut Frame, area: Rect);
 
     fn handle_key(&mut self, key: KeyEvent) -> Option<ScreenCommand>;
 

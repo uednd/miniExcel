@@ -34,7 +34,7 @@ impl Mode for NavigationMode {
                 Self::apply_direction(ctx, nav);
                 ctx.selection = Some(Selection::Range {
                     anchor,
-                    cursor: ctx.cursor,
+                    cursor: ctx.viewport.cursor(),
                 });
                 return ModeAction::Handled;
             }
@@ -50,14 +50,12 @@ impl Mode for NavigationMode {
                     let spec = match *sel {
                         Selection::Row(r) => ClearSpec::Row(r),
                         Selection::Column(c) => ClearSpec::Column(c),
-                        Selection::Range { anchor, cursor } => {
-                            ClearSpec::Rect {
-                                c1: anchor.col.min(cursor.col),
-                                r1: anchor.row.min(cursor.row),
-                                c2: anchor.col.max(cursor.col),
-                                r2: anchor.row.max(cursor.row),
-                            }
-                        }
+                        Selection::Range { anchor, cursor } => ClearSpec::Rect {
+                            c1: anchor.col.min(cursor.col),
+                            r1: anchor.row.min(cursor.row),
+                            c2: anchor.col.max(cursor.col),
+                            r2: anchor.row.max(cursor.row),
+                        },
                     };
                     ctx.wb.clear_region(spec);
                     ctx.selection = None;
@@ -93,11 +91,11 @@ impl Mode for NavigationMode {
 
         // --- 非选中模式：Shift+方向键创建 Range 选区 ---
         if let Some(nav) = Self::parse_shift_direction(key) {
-            let anchor = ctx.cursor;
+            let anchor = ctx.viewport.cursor();
             Self::apply_direction(ctx, nav);
             ctx.selection = Some(Selection::Range {
                 anchor,
-                cursor: ctx.cursor,
+                cursor: ctx.viewport.cursor(),
             });
             return ModeAction::Handled;
         }
@@ -115,7 +113,7 @@ impl Mode for NavigationMode {
                     .modifiers
                     .contains(KeyModifiers::CONTROL | KeyModifiers::SHIFT) =>
             {
-                ctx.selection = Some(Selection::Row(ctx.cursor.row));
+                ctx.selection = Some(Selection::Row(ctx.viewport.cursor_row()));
                 return ModeAction::Handled;
             }
             KeyCode::Up | KeyCode::Down
@@ -123,7 +121,7 @@ impl Mode for NavigationMode {
                     .modifiers
                     .contains(KeyModifiers::CONTROL | KeyModifiers::SHIFT) =>
             {
-                ctx.selection = Some(Selection::Column(ctx.cursor.col));
+                ctx.selection = Some(Selection::Column(ctx.viewport.cursor_col()));
                 return ModeAction::Handled;
             }
             _ => {}
@@ -134,7 +132,7 @@ impl Mode for NavigationMode {
             KeyCode::Enter => {
                 let existing = ctx
                     .wb
-                    .get_cell(ctx.cursor)
+                    .get_cell(ctx.viewport.cursor())
                     .map(|c| c.raw.clone())
                     .unwrap_or_default();
                 ModeAction::SwitchMode(Box::new(EditMode::new(existing, None)))
@@ -142,14 +140,14 @@ impl Mode for NavigationMode {
             KeyCode::Char(c) => {
                 let existing = ctx
                     .wb
-                    .get_cell(ctx.cursor)
+                    .get_cell(ctx.viewport.cursor())
                     .map(|c| c.raw.clone())
                     .unwrap_or_default();
                 ModeAction::SwitchMode(Box::new(EditMode::new(existing, Some(c))))
             }
             KeyCode::Backspace | KeyCode::Delete => {
                 ctx.wb.set_cell(
-                    ctx.cursor,
+                    ctx.viewport.cursor(),
                     String::new(),
                     crate::model::cell::CellValue::Empty,
                 );
@@ -179,7 +177,7 @@ impl Mode for NavigationMode {
             status: Some(Line::from(vec![
                 Span::styled("[", Style::default().fg(ctx.theme.text_dim)),
                 Span::styled(
-                    ctx.cursor.display(),
+                    ctx.viewport.cursor().display(),
                     Style::default().fg(ctx.theme.accent),
                 ),
                 Span::styled(", 导航模式", Style::default().fg(ctx.theme.text_dim)),
@@ -221,12 +219,10 @@ impl NavigationMode {
 
     fn apply_direction(ctx: &mut TableContext, nav: NavigationKey) {
         match nav {
-            NavigationKey::Up if ctx.cursor.row > 0 => ctx.cursor.row -= 1,
-            NavigationKey::Down if ctx.cursor.row + 1 < ctx.wb.rows => ctx.cursor.row += 1,
-            NavigationKey::Left if ctx.cursor.col > 0 => ctx.cursor.col -= 1,
-            NavigationKey::Right if ctx.cursor.col + 1 < ctx.wb.columns => ctx.cursor.col += 1,
-            _ => {}
+            NavigationKey::Up => ctx.viewport.move_up(),
+            NavigationKey::Down => ctx.viewport.move_down(ctx.wb.rows),
+            NavigationKey::Left => ctx.viewport.move_left(),
+            NavigationKey::Right => ctx.viewport.move_right(ctx.wb.columns),
         }
-        ctx.scroll_into_view();
     }
 }

@@ -1,19 +1,13 @@
-use std::cell::Cell;
+use crate::{model::workbook::Workbook, screen::ScreenCommand, theme::Theme};
 
-use crate::{model::{cell::CellAddress, workbook::Workbook}, screen::ScreenCommand, theme::Theme};
-
-use super::mode::Selection;
+use super::{mode::Selection, viewport::Viewport};
 
 /// 所有编辑模式共享的上下文
 pub struct TableContext {
     pub theme: Theme,
     pub path: String,
     pub wb: Workbook,
-    pub cursor: CellAddress,
-    pub scroll_row: usize,
-    pub scroll_col: usize,
-    pub visible_rows: Cell<usize>,
-    pub visible_cols: Cell<usize>,
+    pub viewport: Viewport,
     pub selection: Option<Selection>,
     pub pending_command: Option<ScreenCommand>,
 }
@@ -31,21 +25,15 @@ impl TableContext {
         self.pending_command.take()
     }
 
-    /// 滚动视口以确保光标可见
-    pub fn scroll_into_view(&mut self) {
-        let visible_rows = self.visible_rows.get();
-        let visible_cols = self.visible_cols.get();
-        if self.cursor.row < self.scroll_row {
-            self.scroll_row = self.cursor.row;
-        }
-        if self.cursor.row >= self.scroll_row + visible_rows {
-            self.scroll_row = self.cursor.row.saturating_sub(visible_rows - 1);
-        }
-        if self.cursor.col < self.scroll_col {
-            self.scroll_col = self.cursor.col;
-        }
-        if self.cursor.col >= self.scroll_col + visible_cols {
-            self.scroll_col = self.cursor.col.saturating_sub(visible_cols - 1);
-        }
+    pub fn delete_current_row(&mut self) {
+        self.wb.delete_row(self.viewport.cursor_row());
+        self.viewport.clamp_cursor_row(self.wb.rows);
+        self.viewport.scroll_into_view();
+    }
+
+    pub fn delete_current_column(&mut self) {
+        self.wb.delete_column(self.viewport.cursor_col());
+        self.viewport.clamp_cursor_col(self.wb.columns);
+        self.viewport.scroll_into_view();
     }
 }

@@ -39,7 +39,7 @@ impl MenuScreen {
 }
 
 impl Screen for MenuScreen {
-    fn render(&self, frame: &mut Frame, area: Rect) {
+    fn render(&mut self, frame: &mut Frame, area: Rect) {
         let [_, logo_area, _, body_area, _] = Layout::vertical([
             Constraint::Fill(1),
             Constraint::Length(LOGO_HEIGHT),

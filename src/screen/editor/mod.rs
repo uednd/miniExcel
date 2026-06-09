@@ -5,27 +5,25 @@ mod host;
 mod menu;
 mod mode;
 mod navigation;
+mod viewport;
 
 use crossterm::event::{KeyEvent, MouseEvent, MouseEventKind};
 use ratatui::{Frame, layout::Rect, style::Style, widgets::Block};
 
 use crate::{
     model::{
-        cell::CellAddress,
         limits::{MAX_COLUMNS, MAX_ROWS},
         workbook::Workbook,
     },
     theme::Theme,
-    widget::table::{TableGrid, TableGridConfig},
+    widget::table::{COL_WIDTH, ROW_NUM_WIDTH, TableGrid, TableGridConfig},
 };
 
 pub use self::context::TableContext;
 pub use self::mode::{ModeAction, Selection};
+pub use self::viewport::Viewport;
 
-use self::{
-    host::ModeHost,
-    navigation::NavigationMode,
-};
+use self::{host::ModeHost, navigation::NavigationMode};
 
 use super::{Screen, ScreenCommand};
 
@@ -49,11 +47,7 @@ impl TableScreen {
             theme,
             path,
             wb,
-            cursor: CellAddress::new(0, 0),
-            scroll_row: 0,
-            scroll_col: 0,
-            visible_rows: std::cell::Cell::new(0),
-            visible_cols: std::cell::Cell::new(0),
+            viewport: Viewport::new(),
             selection: None,
             pending_command: None,
         };
@@ -66,7 +60,7 @@ impl TableScreen {
 }
 
 impl Screen for TableScreen {
-    fn render(&self, frame: &mut Frame, area: Rect) {
+    fn render(&mut self, frame: &mut Frame, area: Rect) {
         let table_area = self.host.render(frame, area, &self.ctx);
 
         let table_block = Block::default()
@@ -77,23 +71,23 @@ impl Screen for TableScreen {
         let inner = table_block.inner(table_area);
         frame.render_widget(table_block, table_area);
 
+        let visible_rows = (inner.height.saturating_sub(2) / 2) as usize;
+        let visible_cols = ((inner.width.saturating_sub(ROW_NUM_WIDTH)) / (COL_WIDTH + 1)) as usize;
+        self.ctx.viewport.update_visible(visible_rows, visible_cols);
+
         let edit_buffer = self.host.edit_buffer();
         let selection = self.ctx.selection.as_ref();
-        let (visible_rows, visible_cols) = TableGrid::render(
+        TableGrid::render(
             frame,
             inner,
             TableGridConfig {
                 wb: &self.ctx.wb,
-                scroll_col: self.ctx.scroll_col,
-                scroll_row: self.ctx.scroll_row,
-                cursor: self.ctx.cursor,
+                viewport: &self.ctx.viewport,
                 theme: self.ctx.theme,
                 edit_buffer,
                 selection,
             },
         );
-        self.ctx.visible_rows.set(visible_rows);
-        self.ctx.visible_cols.set(visible_cols);
     }
 
     fn handle_key(&mut self, key: KeyEvent) -> Option<ScreenCommand> {
@@ -101,25 +95,21 @@ impl Screen for TableScreen {
     }
 
     fn handle_scroll(&mut self, event: MouseEvent) -> Option<ScreenCommand> {
-        let visible_rows = self.ctx.visible_rows.get();
-        let visible_cols = self.ctx.visible_cols.get();
-        let max_scroll_row = self.ctx.wb.rows.saturating_sub(visible_rows);
-        let max_scroll_col = self.ctx.wb.columns.saturating_sub(visible_cols);
         match event.kind {
             MouseEventKind::ScrollUp => {
-                self.ctx.scroll_row = self.ctx.scroll_row.saturating_sub(3);
+                self.ctx.viewport.scroll_up(3);
                 Some(ScreenCommand::Stay)
             }
             MouseEventKind::ScrollDown => {
-                self.ctx.scroll_row = (self.ctx.scroll_row + 3).min(max_scroll_row);
+                self.ctx.viewport.scroll_down(3, self.ctx.wb.rows);
                 Some(ScreenCommand::Stay)
             }
             MouseEventKind::ScrollLeft => {
-                self.ctx.scroll_col = self.ctx.scroll_col.saturating_sub(1);
+                self.ctx.viewport.scroll_left(1);
                 Some(ScreenCommand::Stay)
             }
             MouseEventKind::ScrollRight => {
-                self.ctx.scroll_col = (self.ctx.scroll_col + 1).min(max_scroll_col);
+                self.ctx.viewport.scroll_right(1, self.ctx.wb.columns);
                 Some(ScreenCommand::Stay)
             }
             _ => None,
