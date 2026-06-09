@@ -1,6 +1,8 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{Frame, layout::Rect, style::Style, text::Line};
 
+use crate::model::workbook::ClearSpec;
+
 use super::{
     context::TableContext,
     mode::{Mode, ModeAction, ModeKind, Selection},
@@ -43,22 +45,20 @@ impl Mode for NavigationMode {
                     return ModeAction::Nothing;
                 }
                 // Delete/Backspace: 清空选中内容
-                (KeyCode::Delete | KeyCode::Backspace, Selection::Row(r)) => {
-                    ctx.wb.clear_row(*r);
-                    ctx.selection = None;
-                    return ModeAction::Nothing;
-                }
-                (KeyCode::Delete | KeyCode::Backspace, Selection::Column(c)) => {
-                    ctx.wb.clear_column(*c);
-                    ctx.selection = None;
-                    return ModeAction::Nothing;
-                }
-                (
-                    KeyCode::Delete | KeyCode::Backspace,
-                    Selection::Range { anchor, cursor },
-                ) => {
-                    ctx.wb
-                        .clear_range(anchor.0, anchor.1, cursor.0, cursor.1);
+                (KeyCode::Delete | KeyCode::Backspace, _) => {
+                    let spec = match *sel {
+                        Selection::Row(r) => ClearSpec::Row(r),
+                        Selection::Column(c) => ClearSpec::Column(c),
+                        Selection::Range { anchor, cursor } => {
+                            ClearSpec::Rect {
+                                c1: anchor.0.min(cursor.0),
+                                r1: anchor.1.min(cursor.1),
+                                c2: anchor.0.max(cursor.0),
+                                r2: anchor.1.max(cursor.1),
+                            }
+                        }
+                    };
+                    ctx.wb.clear_region(spec);
                     ctx.selection = None;
                     return ModeAction::Nothing;
                 }

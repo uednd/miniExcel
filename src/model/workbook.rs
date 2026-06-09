@@ -6,6 +6,14 @@ use std::path::Path;
 
 use super::cell::{Cell, CellValue, Coord};
 
+/// 清空区域的规格。
+#[derive(Debug, Clone)]
+pub enum ClearSpec {
+    Row(usize),
+    Column(usize),
+    Rect { c1: usize, r1: usize, c2: usize, r2: usize },
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Workbook {
     pub version: u8,
@@ -80,22 +88,20 @@ impl Workbook {
         self.columns -= 1;
     }
 
-    /// 清空指定行所有单元格内容。
-    pub fn clear_row(&mut self, r: usize) {
-        self.cells.retain(|&(_, row), _| row != r);
-    }
-
-    /// 清空指定列所有单元格内容。
-    pub fn clear_column(&mut self, c: usize) {
-        self.cells.retain(|&(col, _), _| col != c);
-    }
-
-    /// 清空矩形区域内所有单元格内容。
-    pub fn clear_range(&mut self, c1: usize, r1: usize, c2: usize, r2: usize) {
-        let (c_min, c_max) = (c1.min(c2), c1.max(c2));
-        let (r_min, r_max) = (r1.min(r2), r1.max(r2));
-        self.cells.retain(|&(col, row), _| {
-            col < c_min || col > c_max || row < r_min || row > r_max
-        });
+    /// 清空指定区域内的所有单元格，不改变行列数。
+    pub fn clear_region(&mut self, spec: ClearSpec) {
+        match spec {
+            ClearSpec::Row(r) => {
+                self.cells.retain(|&(_, row), _| row != r);
+            }
+            ClearSpec::Column(c) => {
+                self.cells.retain(|&(col, _), _| col != c);
+            }
+            ClearSpec::Rect { c1, r1, c2, r2 } => {
+                self.cells.retain(|&(col, row), _| {
+                    col < c1 || col > c2 || row < r1 || row > r2
+                });
+            }
+        }
     }
 }
