@@ -12,6 +12,7 @@ use crate::{
         workbook::Workbook,
     },
     theme::Theme,
+    util::blink_visible,
 };
 
 /// 单元格列宽
@@ -55,13 +56,12 @@ impl TableGrid {
             widths.push(Constraint::Length(COL_WIDTH));
         }
 
+        let col_end = (cfg.scroll_col + visible_cols).min(cfg.wb.columns);
+
         // 表头行
-        let mut header_cells = vec![Cell::from("").style(header_style)];
-        for ci in cfg.scroll_col..cfg.scroll_col + visible_cols {
-            // 防止列数超过工作表实际列数导致的越界
-            if ci >= cfg.wb.columns {
-                break;
-            }
+        let mut header_cells = Vec::with_capacity(col_end.saturating_sub(cfg.scroll_col) + 1);
+        header_cells.push(Cell::from("").style(header_style));
+        for ci in cfg.scroll_col..col_end {
             // 光标列高亮
             let style = if ci == cfg.cursor_col {
                 selected_header_style
@@ -73,13 +73,11 @@ impl TableGrid {
             );
         }
 
-        // 数据行
-        let mut rows: Vec<Row> = Vec::new();
-        for ri in cfg.scroll_row..cfg.scroll_row + visible_rows {
-            if ri >= cfg.wb.rows {
-                break;
-            }
+        let row_end = (cfg.scroll_row + visible_rows).min(cfg.wb.rows);
 
+        // 数据行
+        let mut rows: Vec<Row> = Vec::with_capacity(row_end.saturating_sub(cfg.scroll_row));
+        for ri in cfg.scroll_row..row_end {
             let label_style = if ri == cfg.cursor_row {
                 selected_header_style
             } else {
@@ -90,17 +88,18 @@ impl TableGrid {
                 Cell::from(Line::from((ri + 1).to_string()).alignment(Alignment::Right))
                     .style(label_style),
             ];
-            for ci in cfg.scroll_col..cfg.scroll_col + visible_cols {
-                if ci >= cfg.wb.columns {
-                    break;
-                }
+            for ci in cfg.scroll_col..col_end {
                 let text = if ci == cfg.cursor_col && ri == cfg.cursor_row {
                     // 编辑模式
                     if let Some(buffer) = cfg.edit_buffer {
-                        if buffer.is_empty() {
-                            "█".to_string()
+                        if blink_visible() {
+                            if buffer.is_empty() {
+                                "█".to_string()
+                            } else {
+                                format!("{}█", buffer)
+                            }
                         } else {
-                            format!("{}█", buffer)
+                            buffer.to_string()
                         }
                     } else {
                         cell_text(cfg.wb, ci, ri)

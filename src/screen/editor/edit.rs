@@ -7,7 +7,10 @@ use ratatui::{
     widgets::Paragraph,
 };
 
-use crate::model::cell::CellValue;
+use crate::{
+    model::cell::CellValue,
+    util::cursor_span,
+};
 
 use super::{
     context::TableContext,
@@ -79,7 +82,7 @@ impl Mode for EditMode {
                 self.buffer.as_str(),
                 Style::default().fg(ctx.theme.text),
             ));
-            spans.push(Span::styled("█", Style::default().fg(ctx.theme.text)));
+            spans.push(cursor_span(Style::default().fg(ctx.theme.text)));
         }
 
         frame.render_widget(Paragraph::new(Line::from(spans)), edit_area);
