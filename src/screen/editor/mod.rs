@@ -8,7 +8,10 @@ use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseEvent, MouseEventKi
 use ratatui::{Frame, layout::Rect, style::Style, widgets::Block};
 
 use crate::{
-    model::workbook::Workbook,
+    model::{
+        limits::{MAX_COLUMNS, MAX_ROWS},
+        workbook::Workbook,
+    },
     theme::Theme,
     widget::table::{TableGrid, TableGridConfig},
 };
@@ -36,7 +39,7 @@ impl TableScreen {
                 .and_then(|s| s.to_str())
                 .unwrap_or("untitled")
                 .to_string();
-            Workbook::new(name, 26, 100)
+            Workbook::new(name, MAX_COLUMNS, MAX_ROWS)
         });
 
         let ctx = TableContext {

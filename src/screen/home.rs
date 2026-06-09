@@ -7,7 +7,10 @@ use ratatui::{
 };
 
 use crate::{
-    model::workbook::Workbook,
+    model::{
+        limits::{MAX_COLUMNS, MAX_ROWS},
+        workbook::Workbook,
+    },
     theme::Theme,
     widget::{
         logo::{LOGO_HEIGHT, Logo},
@@ -55,7 +58,7 @@ impl Screen for MenuScreen {
             Some(TabAction::Handled) => Some(ScreenCommand::Stay),
             Some(TabAction::CreateTable(name)) => {
                 let path = format!("{}/{}.mxlsx", self.cwd, name);
-                let wb = Workbook::new(name, 26, 100);
+                let wb = Workbook::new(name, MAX_COLUMNS, MAX_ROWS);
                 if wb.save(&path).is_ok() {
                     Some(ScreenCommand::OpenEditor { path })
                 } else {
