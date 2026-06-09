@@ -2,6 +2,8 @@ use std::cell::Cell;
 
 use crate::{model::workbook::Workbook, theme::Theme};
 
+use super::mode::Selection;
+
 /// 所有编辑模式共享的上下文
 pub struct TableContext {
     pub theme: Theme,
@@ -13,6 +15,7 @@ pub struct TableContext {
     pub scroll_col: usize,
     pub visible_rows: Cell<usize>,
     pub visible_cols: Cell<usize>,
+    pub selection: Option<Selection>,
 }
 
 impl TableContext {

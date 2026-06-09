@@ -56,11 +56,12 @@ impl TableScreen {
             scroll_col: 0,
             visible_rows: std::cell::Cell::new(0),
             visible_cols: std::cell::Cell::new(0),
+            selection: None,
         };
 
         Self {
             ctx,
-            mode: Box::new(NavigationMode::new()),
+            mode: Box::new(NavigationMode),
         }
     }
 }
@@ -78,7 +79,7 @@ impl Screen for TableScreen {
         frame.render_widget(table_block, table_area);
 
         let edit_buffer = self.mode.edit_buffer();
-        let selection = self.mode.selection();
+        let selection = self.ctx.selection.as_ref();
         let (visible_rows, visible_cols) = TableGrid::render(
             frame,
             inner,
@@ -111,7 +112,7 @@ impl Screen for TableScreen {
         // Ctrl+P: 切换菜单面板
         if key.code == KeyCode::Char('p') && key.modifiers.contains(KeyModifiers::CONTROL) {
             self.mode = match self.mode.kind() {
-                ModeKind::Menu | ModeKind::Delete => Box::new(NavigationMode::new()),
+                ModeKind::Menu | ModeKind::Delete => Box::new(NavigationMode),
                 _ => Box::new(MenuMode::new()),
             };
             return Some(ScreenCommand::Stay);
@@ -140,7 +141,7 @@ impl Screen for TableScreen {
                 Some(ScreenCommand::Stay)
             }
             ModeAction::SwitchToNavigation => {
-                self.mode = Box::new(NavigationMode::new());
+                self.mode = Box::new(NavigationMode);
                 Some(ScreenCommand::Stay)
             }
             ModeAction::ScreenCommand(cmd) => Some(cmd),

@@ -49,9 +49,4 @@ pub trait Mode {
     fn edit_buffer(&self) -> Option<&str> {
         None
     }
-
-    /// 当前选中区域，仅 NavigationMode 返回非 None。
-    fn selection(&self) -> Option<&Selection> {
-        None
-    }
 }
