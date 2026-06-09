@@ -12,7 +12,7 @@ pub struct Workbook {
     pub name: String,
     pub columns: usize,
     pub rows: usize,
-    pub cells: HashMap<String, Cell>,
+    pub cells: HashMap<Coord, Cell>,
 }
 
 impl Workbook {
@@ -37,13 +37,11 @@ impl Workbook {
     }
 
     pub fn get_cell(&self, coord: Coord) -> Option<&Cell> {
-        let key = coord_key(coord);
-        self.cells.get(&key)
+        self.cells.get(&coord)
     }
 
     pub fn set_cell(&mut self, coord: Coord, raw: String, value: CellValue) {
-        let key = coord_key(coord);
-        self.cells.insert(key, Cell { raw, value });
+        self.cells.insert(coord, Cell { raw, value });
     }
 
     /// 删除指定行，该行上方的行不动，下方行上移，总行数减一。
@@ -52,13 +50,12 @@ impl Workbook {
         if self.rows <= 1 {
             return;
         }
-        let mut new_cells: HashMap<String, Cell> = HashMap::new();
-        for (key, cell) in self.cells.drain() {
-            let (col, row) = parse_coord(&key);
+        let mut new_cells: HashMap<Coord, Cell> = HashMap::new();
+        for ((col, row), cell) in self.cells.drain() {
             if row < r {
-                new_cells.insert(key, cell);
+                new_cells.insert((col, row), cell);
             } else if row > r {
-                new_cells.insert(coord_key((col, row - 1)), cell);
+                new_cells.insert((col, row - 1), cell);
             }
         }
         self.cells = new_cells;
@@ -71,31 +68,15 @@ impl Workbook {
         if self.columns <= 1 {
             return;
         }
-        let mut new_cells: HashMap<String, Cell> = HashMap::new();
-        for (key, cell) in self.cells.drain() {
-            let (col, row) = parse_coord(&key);
+        let mut new_cells: HashMap<Coord, Cell> = HashMap::new();
+        for ((col, row), cell) in self.cells.drain() {
             if col < c {
-                new_cells.insert(key, cell);
+                new_cells.insert((col, row), cell);
             } else if col > c {
-                new_cells.insert(coord_key((col - 1, row)), cell);
+                new_cells.insert((col - 1, row), cell);
             }
         }
         self.cells = new_cells;
         self.columns -= 1;
     }
-
-}
-
-/// Tuple 转 String 作为 HashMap 的 key，用于 JSON 序列化和反序列化
-fn coord_key(coord: Coord) -> String {
-    format!("{},{}", coord.0, coord.1)
-}
-
-/// 从 HashMap key ("col,row") 反向解析为 (col, row) 元组。
-fn parse_coord(key: &str) -> Coord {
-    let (col_str, row_str) = key.split_once(',').unwrap_or(("0", "0"));
-    (
-        col_str.parse().unwrap_or(0),
-        row_str.parse().unwrap_or(0),
-    )
 }
