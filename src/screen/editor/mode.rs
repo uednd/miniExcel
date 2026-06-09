@@ -2,7 +2,7 @@ use crossterm::event::KeyEvent;
 use ratatui::{Frame, layout::Rect, text::Line};
 
 use super::context::TableContext;
-use crate::screen::ScreenCommand;
+use crate::{model::cell::CellAddress, screen::ScreenCommand};
 
 /// 模式处理按键后的动作。
 pub enum ModeAction {
@@ -16,8 +16,7 @@ pub enum ModeAction {
 pub enum Selection {
     Row(usize),
     Column(usize),
-    #[allow(dead_code)]
-    Range { anchor: (usize, usize), cursor: (usize, usize) },
+    Range { anchor: CellAddress, cursor: CellAddress },
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
