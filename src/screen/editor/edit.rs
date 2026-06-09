@@ -14,7 +14,8 @@ use crate::{
 
 use super::{
     context::TableContext,
-    mode::{Mode, ModeAction, ModeKind},
+    mode::{FooterLine, Mode, ModeAction, ModeKind},
+    navigation::NavigationMode,
 };
 
 /// 编辑模式
@@ -47,22 +48,22 @@ impl Mode for EditMode {
                         CellValue::Text(self.buffer.clone()),
                     );
                 }
-                ModeAction::SwitchToNavigation
+                ModeAction::SwitchMode(Box::new(NavigationMode))
             }
-            KeyCode::Esc => ModeAction::SwitchToNavigation,
+            KeyCode::Esc => ModeAction::SwitchMode(Box::new(NavigationMode)),
             KeyCode::Backspace => {
                 self.buffer.pop();
-                ModeAction::Nothing
+                ModeAction::Handled
             }
             KeyCode::Char(c) => {
                 self.buffer.push(c);
-                ModeAction::Nothing
+                ModeAction::Handled
             }
-            _ => ModeAction::Nothing,
+            _ => ModeAction::Handled,
         }
     }
 
-    fn render_frame(&self, frame: &mut Frame, area: Rect, ctx: &TableContext) -> Rect {
+    fn render(&self, frame: &mut Frame, area: Rect, ctx: &TableContext) -> Rect {
         use ratatui::text::Span;
 
         let [table_area, edit_area] =
@@ -93,27 +94,25 @@ impl Mode for EditMode {
         Some(&self.buffer)
     }
 
-    fn footer_hint(&self, ctx: &TableContext) -> Option<Line<'static>> {
+    fn footer(&self, ctx: &TableContext) -> FooterLine {
         use ratatui::text::Span;
-        Some(Line::from(vec![
-            Span::styled("Enter", Style::default().fg(ctx.theme.accent)),
-            Span::styled(" 确认", Style::default().fg(ctx.theme.text_dim)),
-            Span::styled("  ", Style::default().fg(ctx.theme.text_dim)),
-            Span::styled("Esc", Style::default().fg(ctx.theme.accent)),
-            Span::styled(" 取消", Style::default().fg(ctx.theme.text_dim)),
-        ]))
-    }
-
-    fn footer_status(&self, ctx: &TableContext) -> Option<Line<'static>> {
-        use ratatui::text::Span;
-        Some(Line::from(vec![
-            Span::styled("[", Style::default().fg(ctx.theme.text_dim)),
-            Span::styled(
-                ctx.cursor.display(),
-                Style::default().fg(ctx.theme.accent),
-            ),
-            Span::styled(", 编辑模式", Style::default().fg(ctx.theme.text_dim)),
-            Span::styled("]", Style::default().fg(ctx.theme.text_dim)),
-        ]))
+        FooterLine {
+            hint: Some(Line::from(vec![
+                Span::styled("Enter", Style::default().fg(ctx.theme.accent)),
+                Span::styled(" 确认", Style::default().fg(ctx.theme.text_dim)),
+                Span::styled("  ", Style::default().fg(ctx.theme.text_dim)),
+                Span::styled("Esc", Style::default().fg(ctx.theme.accent)),
+                Span::styled(" 取消", Style::default().fg(ctx.theme.text_dim)),
+            ])),
+            status: Some(Line::from(vec![
+                Span::styled("[", Style::default().fg(ctx.theme.text_dim)),
+                Span::styled(
+                    ctx.cursor.display(),
+                    Style::default().fg(ctx.theme.accent),
+                ),
+                Span::styled(", 编辑模式", Style::default().fg(ctx.theme.text_dim)),
+                Span::styled("]", Style::default().fg(ctx.theme.text_dim)),
+            ])),
+        }
     }
 }

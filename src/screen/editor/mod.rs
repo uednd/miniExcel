@@ -1,11 +1,12 @@
 mod context;
 mod delete;
 mod edit;
+mod host;
 mod menu;
 mod mode;
 mod navigation;
 
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseEvent, MouseEventKind};
+use crossterm::event::{KeyEvent, MouseEvent, MouseEventKind};
 use ratatui::{Frame, layout::Rect, style::Style, widgets::Block};
 
 use crate::{
@@ -19,13 +20,10 @@ use crate::{
 };
 
 pub use self::context::TableContext;
-pub use self::mode::{ModeAction, ModeKind, Selection};
+pub use self::mode::{ModeAction, Selection};
 
 use self::{
-    delete::DeleteMode,
-    edit::EditMode,
-    menu::MenuMode,
-    mode::Mode,
+    host::ModeHost,
     navigation::NavigationMode,
 };
 
@@ -33,7 +31,7 @@ use super::{Screen, ScreenCommand};
 
 pub struct TableScreen {
     ctx: TableContext,
-    mode: Box<dyn Mode>,
+    host: ModeHost,
 }
 
 impl TableScreen {
@@ -57,18 +55,19 @@ impl TableScreen {
             visible_rows: std::cell::Cell::new(0),
             visible_cols: std::cell::Cell::new(0),
             selection: None,
+            pending_command: None,
         };
 
         Self {
             ctx,
-            mode: Box::new(NavigationMode),
+            host: ModeHost::new(Box::new(NavigationMode)),
         }
     }
 }
 
 impl Screen for TableScreen {
     fn render(&self, frame: &mut Frame, area: Rect) {
-        let table_area = self.mode.render_frame(frame, area, &self.ctx);
+        let table_area = self.host.render(frame, area, &self.ctx);
 
         let table_block = Block::default()
             .borders(ratatui::widgets::Borders::ALL)
@@ -78,7 +77,7 @@ impl Screen for TableScreen {
         let inner = table_block.inner(table_area);
         frame.render_widget(table_block, table_area);
 
-        let edit_buffer = self.mode.edit_buffer();
+        let edit_buffer = self.host.edit_buffer();
         let selection = self.ctx.selection.as_ref();
         let (visible_rows, visible_cols) = TableGrid::render(
             frame,
@@ -98,53 +97,7 @@ impl Screen for TableScreen {
     }
 
     fn handle_key(&mut self, key: KeyEvent) -> Option<ScreenCommand> {
-        // Ctrl+S: 保存工作簿（菜单模式下不拦截，由菜单自身处理）
-        if key.code == KeyCode::Char('s')
-            && key.modifiers.contains(KeyModifiers::CONTROL)
-            && self.mode.kind() != ModeKind::Menu
-            && self.mode.kind() != ModeKind::Delete
-        {
-            self.ctx.save();
-            return Some(ScreenCommand::Stay);
-        }
-
-        // Ctrl+P: 切换菜单面板
-        if key.code == KeyCode::Char('p') && key.modifiers.contains(KeyModifiers::CONTROL) {
-            self.mode = match self.mode.kind() {
-                ModeKind::Menu | ModeKind::Delete => Box::new(NavigationMode),
-                _ => Box::new(MenuMode::new()),
-            };
-            return Some(ScreenCommand::Stay);
-        }
-
-        // Ctrl+D: 打开删除面板（仅在导航和编辑模式下可用）
-        if key.code == KeyCode::Char('d')
-            && key.modifiers.contains(KeyModifiers::CONTROL)
-            && self.mode.kind() != ModeKind::Menu
-            && self.mode.kind() != ModeKind::Delete
-        {
-            self.mode = Box::new(DeleteMode::new());
-            return Some(ScreenCommand::Stay);
-        }
-
-        match self.mode.handle_key(&mut self.ctx, key) {
-            ModeAction::Nothing => Some(ScreenCommand::Stay),
-            ModeAction::SwitchToEdit { initial_char } => {
-                let existing = self
-                    .ctx
-                    .wb
-                    .get_cell(self.ctx.cursor)
-                    .map(|c| c.raw.clone())
-                    .unwrap_or_default();
-                self.mode = Box::new(EditMode::new(existing, initial_char));
-                Some(ScreenCommand::Stay)
-            }
-            ModeAction::SwitchToNavigation => {
-                self.mode = Box::new(NavigationMode);
-                Some(ScreenCommand::Stay)
-            }
-            ModeAction::ScreenCommand(cmd) => Some(cmd),
-        }
+        self.host.handle_key(&mut self.ctx, key)
     }
 
     fn handle_scroll(&mut self, event: MouseEvent) -> Option<ScreenCommand> {
@@ -174,10 +127,10 @@ impl Screen for TableScreen {
     }
 
     fn footer_hint(&self) -> Option<ratatui::text::Line<'static>> {
-        self.mode.footer_hint(&self.ctx)
+        self.host.footer(&self.ctx).hint
     }
 
     fn footer_status(&self) -> Option<ratatui::text::Line<'static>> {
-        self.mode.footer_status(&self.ctx)
+        self.host.footer(&self.ctx).status
     }
 }

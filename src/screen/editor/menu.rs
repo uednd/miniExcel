@@ -7,14 +7,12 @@ use ratatui::{
     widgets::Block,
 };
 
-use crate::{
-    screen::ScreenCommand,
-    widget::selectable_list::{SelectableItem, SelectableList},
-};
+use crate::widget::selectable_list::{SelectableItem, SelectableList};
 
 use super::{
     context::TableContext,
-    mode::{Mode, ModeAction, ModeKind},
+    mode::{FooterLine, Mode, ModeAction, ModeKind},
+    navigation::NavigationMode,
 };
 
 const MENU_WIDTH: u16 = 20;
@@ -28,14 +26,16 @@ impl MenuMode {
         let items = vec![
             SelectableItem::new("保存", |ctx: &mut TableContext| {
                 ctx.save();
-                ModeAction::SwitchToNavigation
+                ModeAction::SwitchMode(Box::new(NavigationMode))
             }),
             SelectableItem::new("保存并退出", |ctx: &mut TableContext| {
                 ctx.save();
-                ModeAction::ScreenCommand(ScreenCommand::GoHome)
+                ctx.go_home();
+                ModeAction::Handled
             }),
-            SelectableItem::new("返回首页", |_ctx| {
-                ModeAction::ScreenCommand(ScreenCommand::GoHome)
+            SelectableItem::new("返回首页", |ctx: &mut TableContext| {
+                ctx.go_home();
+                ModeAction::Handled
             }),
         ];
         Self {
@@ -53,24 +53,24 @@ impl Mode for MenuMode {
         match key.code {
             KeyCode::Up => {
                 self.list.handle_up();
-                ModeAction::Nothing
+                ModeAction::Handled
             }
             KeyCode::Down => {
                 self.list.handle_down();
-                ModeAction::Nothing
+                ModeAction::Handled
             }
             KeyCode::Enter => {
                 if let Some(action) = self.list.handle_enter(ctx) {
                     action
                 } else {
-                    ModeAction::Nothing
+                    ModeAction::Handled
                 }
             }
-            _ => ModeAction::Nothing,
+            _ => ModeAction::Handled,
         }
     }
 
-    fn render_frame(&self, frame: &mut Frame, area: Rect, ctx: &TableContext) -> Rect {
+    fn render(&self, frame: &mut Frame, area: Rect, ctx: &TableContext) -> Rect {
         let [table_area, menu_area] =
             Layout::horizontal([Constraint::Fill(1), Constraint::Length(MENU_WIDTH)]).areas(area);
 
@@ -82,17 +82,20 @@ impl Mode for MenuMode {
         table_area
     }
 
-    fn footer_hint(&self, ctx: &TableContext) -> Option<Line<'static>> {
+    fn footer(&self, ctx: &TableContext) -> FooterLine {
         use ratatui::text::Span;
-        Some(Line::from(vec![
-            Span::styled("↑ / ↓", Style::default().fg(ctx.theme.accent)),
-            Span::styled(" 选择", Style::default().fg(ctx.theme.text_dim)),
-            Span::styled("  ", Style::default().fg(ctx.theme.text_dim)),
-            Span::styled("Enter", Style::default().fg(ctx.theme.accent)),
-            Span::styled(" 确认", Style::default().fg(ctx.theme.text_dim)),
-            Span::styled("  ", Style::default().fg(ctx.theme.text_dim)),
-            Span::styled("Ctrl+P", Style::default().fg(ctx.theme.accent)),
-            Span::styled(" 关闭", Style::default().fg(ctx.theme.text_dim)),
-        ]))
+        FooterLine {
+            hint: Some(Line::from(vec![
+                Span::styled("↑ / ↓", Style::default().fg(ctx.theme.accent)),
+                Span::styled(" 选择", Style::default().fg(ctx.theme.text_dim)),
+                Span::styled("  ", Style::default().fg(ctx.theme.text_dim)),
+                Span::styled("Enter", Style::default().fg(ctx.theme.accent)),
+                Span::styled(" 确认", Style::default().fg(ctx.theme.text_dim)),
+                Span::styled("  ", Style::default().fg(ctx.theme.text_dim)),
+                Span::styled("Ctrl+P", Style::default().fg(ctx.theme.accent)),
+                Span::styled(" 关闭", Style::default().fg(ctx.theme.text_dim)),
+            ])),
+            status: None,
+        }
     }
 }

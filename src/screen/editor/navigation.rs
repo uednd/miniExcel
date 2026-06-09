@@ -5,7 +5,8 @@ use crate::model::workbook::ClearSpec;
 
 use super::{
     context::TableContext,
-    mode::{Mode, ModeAction, ModeKind, Selection},
+    edit::EditMode,
+    mode::{FooterLine, Mode, ModeAction, ModeKind, Selection},
 };
 
 enum NavigationKey {
@@ -35,14 +36,14 @@ impl Mode for NavigationMode {
                     anchor,
                     cursor: ctx.cursor,
                 });
-                return ModeAction::Nothing;
+                return ModeAction::Handled;
             }
 
             match (key.code, sel) {
                 // Esc 退出选中
                 (KeyCode::Esc, _) => {
                     ctx.selection = None;
-                    return ModeAction::Nothing;
+                    return ModeAction::Handled;
                 }
                 // Delete/Backspace: 清空选中内容
                 (KeyCode::Delete | KeyCode::Backspace, _) => {
@@ -60,7 +61,7 @@ impl Mode for NavigationMode {
                     };
                     ctx.wb.clear_region(spec);
                     ctx.selection = None;
-                    return ModeAction::Nothing;
+                    return ModeAction::Handled;
                 }
                 // 同快捷键再次按退出选中（仅 Row/Column）
                 (KeyCode::Left | KeyCode::Right, Selection::Row(_))
@@ -69,7 +70,7 @@ impl Mode for NavigationMode {
                         .contains(KeyModifiers::CONTROL | KeyModifiers::SHIFT) =>
                 {
                     ctx.selection = None;
-                    return ModeAction::Nothing;
+                    return ModeAction::Handled;
                 }
                 (KeyCode::Up | KeyCode::Down, Selection::Column(_))
                     if key
@@ -77,16 +78,16 @@ impl Mode for NavigationMode {
                         .contains(KeyModifiers::CONTROL | KeyModifiers::SHIFT) =>
                 {
                     ctx.selection = None;
-                    return ModeAction::Nothing;
+                    return ModeAction::Handled;
                 }
                 // 方向键退出选中并执行移动
                 _ if Self::parse_direction(key).is_some() => {
                     let nav = Self::parse_direction(key).unwrap();
                     ctx.selection = None;
                     Self::apply_direction(ctx, nav);
-                    return ModeAction::Nothing;
+                    return ModeAction::Handled;
                 }
-                _ => return ModeAction::Nothing,
+                _ => return ModeAction::Handled,
             }
         }
 
@@ -98,13 +99,13 @@ impl Mode for NavigationMode {
                 anchor,
                 cursor: ctx.cursor,
             });
-            return ModeAction::Nothing;
+            return ModeAction::Handled;
         }
 
         // --- 非选中模式：方向键 ---
         if let Some(nav) = Self::parse_direction(key) {
             Self::apply_direction(ctx, nav);
-            return ModeAction::Nothing;
+            return ModeAction::Handled;
         }
 
         // --- 非选中模式：选区快捷键（Ctrl+Shift+方向键） ---
@@ -115,7 +116,7 @@ impl Mode for NavigationMode {
                     .contains(KeyModifiers::CONTROL | KeyModifiers::SHIFT) =>
             {
                 ctx.selection = Some(Selection::Row(ctx.cursor.row));
-                return ModeAction::Nothing;
+                return ModeAction::Handled;
             }
             KeyCode::Up | KeyCode::Down
                 if key
@@ -123,58 +124,68 @@ impl Mode for NavigationMode {
                     .contains(KeyModifiers::CONTROL | KeyModifiers::SHIFT) =>
             {
                 ctx.selection = Some(Selection::Column(ctx.cursor.col));
-                return ModeAction::Nothing;
+                return ModeAction::Handled;
             }
             _ => {}
         }
 
         // --- 原有逻辑 ---
         match key.code {
-            KeyCode::Enter => ModeAction::SwitchToEdit { initial_char: None },
-            KeyCode::Char(c) => ModeAction::SwitchToEdit {
-                initial_char: Some(c),
-            },
+            KeyCode::Enter => {
+                let existing = ctx
+                    .wb
+                    .get_cell(ctx.cursor)
+                    .map(|c| c.raw.clone())
+                    .unwrap_or_default();
+                ModeAction::SwitchMode(Box::new(EditMode::new(existing, None)))
+            }
+            KeyCode::Char(c) => {
+                let existing = ctx
+                    .wb
+                    .get_cell(ctx.cursor)
+                    .map(|c| c.raw.clone())
+                    .unwrap_or_default();
+                ModeAction::SwitchMode(Box::new(EditMode::new(existing, Some(c))))
+            }
             KeyCode::Backspace | KeyCode::Delete => {
                 ctx.wb.set_cell(
                     ctx.cursor,
                     String::new(),
                     crate::model::cell::CellValue::Empty,
                 );
-                ModeAction::Nothing
+                ModeAction::Handled
             }
-            _ => ModeAction::Nothing,
+            _ => ModeAction::Handled,
         }
     }
 
-    fn render_frame(&self, _frame: &mut Frame, area: Rect, _ctx: &TableContext) -> Rect {
+    fn render(&self, _frame: &mut Frame, area: Rect, _ctx: &TableContext) -> Rect {
         area
     }
 
-    fn footer_hint(&self, ctx: &TableContext) -> Option<Line<'static>> {
+    fn footer(&self, ctx: &TableContext) -> FooterLine {
         use ratatui::text::Span;
-        Some(Line::from(vec![
-            Span::styled("Ctrl+S", Style::default().fg(ctx.theme.accent)),
-            Span::styled(" 保存", Style::default().fg(ctx.theme.text_dim)),
-            Span::styled("  ", Style::default().fg(ctx.theme.text_dim)),
-            Span::styled("Ctrl+P", Style::default().fg(ctx.theme.accent)),
-            Span::styled(" 菜单", Style::default().fg(ctx.theme.text_dim)),
-            Span::styled("  ", Style::default().fg(ctx.theme.text_dim)),
-            Span::styled("Enter", Style::default().fg(ctx.theme.accent)),
-            Span::styled(" 编辑", Style::default().fg(ctx.theme.text_dim)),
-        ]))
-    }
-
-    fn footer_status(&self, ctx: &TableContext) -> Option<Line<'static>> {
-        use ratatui::text::Span;
-        Some(Line::from(vec![
-            Span::styled("[", Style::default().fg(ctx.theme.text_dim)),
-            Span::styled(
-                ctx.cursor.display(),
-                Style::default().fg(ctx.theme.accent),
-            ),
-            Span::styled(", 导航模式", Style::default().fg(ctx.theme.text_dim)),
-            Span::styled("]", Style::default().fg(ctx.theme.text_dim)),
-        ]))
+        FooterLine {
+            hint: Some(Line::from(vec![
+                Span::styled("Ctrl+S", Style::default().fg(ctx.theme.accent)),
+                Span::styled(" 保存", Style::default().fg(ctx.theme.text_dim)),
+                Span::styled("  ", Style::default().fg(ctx.theme.text_dim)),
+                Span::styled("Ctrl+P", Style::default().fg(ctx.theme.accent)),
+                Span::styled(" 菜单", Style::default().fg(ctx.theme.text_dim)),
+                Span::styled("  ", Style::default().fg(ctx.theme.text_dim)),
+                Span::styled("Enter", Style::default().fg(ctx.theme.accent)),
+                Span::styled(" 编辑", Style::default().fg(ctx.theme.text_dim)),
+            ])),
+            status: Some(Line::from(vec![
+                Span::styled("[", Style::default().fg(ctx.theme.text_dim)),
+                Span::styled(
+                    ctx.cursor.display(),
+                    Style::default().fg(ctx.theme.accent),
+                ),
+                Span::styled(", 导航模式", Style::default().fg(ctx.theme.text_dim)),
+                Span::styled("]", Style::default().fg(ctx.theme.text_dim)),
+            ])),
+        }
     }
 }
 

@@ -11,7 +11,8 @@ use crate::widget::selectable_list::{SelectableItem, SelectableList};
 
 use super::{
     context::TableContext,
-    mode::{Mode, ModeAction, ModeKind},
+    mode::{FooterLine, Mode, ModeAction, ModeKind},
+    navigation::NavigationMode,
 };
 
 const PANEL_WIDTH: u16 = 20;
@@ -31,7 +32,7 @@ impl DeleteMode {
                     ctx.cursor.row = ctx.wb.rows.saturating_sub(1);
                 }
                 ctx.scroll_into_view();
-                ModeAction::SwitchToNavigation
+                ModeAction::SwitchMode(Box::new(NavigationMode))
             }),
             SelectableItem::new("删除整列", |ctx: &mut TableContext| {
                 ctx.wb.delete_column(ctx.cursor.col);
@@ -39,7 +40,7 @@ impl DeleteMode {
                     ctx.cursor.col = ctx.wb.columns.saturating_sub(1);
                 }
                 ctx.scroll_into_view();
-                ModeAction::SwitchToNavigation
+                ModeAction::SwitchMode(Box::new(NavigationMode))
             }),
         ];
         Self {
@@ -57,25 +58,25 @@ impl Mode for DeleteMode {
         match key.code {
             KeyCode::Up => {
                 self.list.handle_up();
-                ModeAction::Nothing
+                ModeAction::Handled
             }
             KeyCode::Down => {
                 self.list.handle_down();
-                ModeAction::Nothing
+                ModeAction::Handled
             }
             KeyCode::Enter => {
                 if let Some(action) = self.list.handle_enter(ctx) {
                     action
                 } else {
-                    ModeAction::Nothing
+                    ModeAction::Handled
                 }
             }
-            KeyCode::Esc => ModeAction::SwitchToNavigation,
-            _ => ModeAction::Nothing,
+            KeyCode::Esc => ModeAction::SwitchMode(Box::new(NavigationMode)),
+            _ => ModeAction::Handled,
         }
     }
 
-    fn render_frame(&self, frame: &mut Frame, area: Rect, ctx: &TableContext) -> Rect {
+    fn render(&self, frame: &mut Frame, area: Rect, ctx: &TableContext) -> Rect {
         let [table_area, panel_area] =
             Layout::horizontal([Constraint::Fill(1), Constraint::Length(PANEL_WIDTH)]).areas(area);
 
@@ -88,17 +89,20 @@ impl Mode for DeleteMode {
         table_area
     }
 
-    fn footer_hint(&self, ctx: &TableContext) -> Option<Line<'static>> {
+    fn footer(&self, ctx: &TableContext) -> FooterLine {
         use ratatui::text::Span;
-        Some(Line::from(vec![
-            Span::styled("↑ / ↓", Style::default().fg(ctx.theme.accent)),
-            Span::styled(" 选择", Style::default().fg(ctx.theme.text_dim)),
-            Span::styled("  ", Style::default().fg(ctx.theme.text_dim)),
-            Span::styled("Enter", Style::default().fg(ctx.theme.accent)),
-            Span::styled(" 确认", Style::default().fg(ctx.theme.text_dim)),
-            Span::styled("  ", Style::default().fg(ctx.theme.text_dim)),
-            Span::styled("Esc", Style::default().fg(ctx.theme.accent)),
-            Span::styled(" 取消", Style::default().fg(ctx.theme.text_dim)),
-        ]))
+        FooterLine {
+            hint: Some(Line::from(vec![
+                Span::styled("↑ / ↓", Style::default().fg(ctx.theme.accent)),
+                Span::styled(" 选择", Style::default().fg(ctx.theme.text_dim)),
+                Span::styled("  ", Style::default().fg(ctx.theme.text_dim)),
+                Span::styled("Enter", Style::default().fg(ctx.theme.accent)),
+                Span::styled(" 确认", Style::default().fg(ctx.theme.text_dim)),
+                Span::styled("  ", Style::default().fg(ctx.theme.text_dim)),
+                Span::styled("Esc", Style::default().fg(ctx.theme.accent)),
+                Span::styled(" 取消", Style::default().fg(ctx.theme.text_dim)),
+            ])),
+            status: None,
+        }
     }
 }

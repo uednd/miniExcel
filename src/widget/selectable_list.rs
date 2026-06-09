@@ -1,9 +1,9 @@
 use ratatui::{
+    Frame,
     layout::{Constraint, Layout, Rect},
     style::Style,
     text::Line,
     widgets::{List, ListItem},
-    Frame,
 };
 
 use crate::{
@@ -57,9 +57,7 @@ impl SelectableList {
 
     /// 执行当前选中项的 action 闭包，返回 ModeAction。
     pub fn handle_enter(&self, ctx: &mut TableContext) -> Option<ModeAction> {
-        self.items
-            .get(self.selected)
-            .map(|item| (item.action)(ctx))
+        self.items.get(self.selected).map(|item| (item.action)(ctx))
     }
 
     /// 在指定区域内渲染选择列表。

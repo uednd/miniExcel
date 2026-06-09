@@ -2,21 +2,24 @@ use crossterm::event::KeyEvent;
 use ratatui::{Frame, layout::Rect, text::Line};
 
 use super::context::TableContext;
-use crate::{model::cell::CellAddress, screen::ScreenCommand};
+use crate::model::cell::CellAddress;
 
-/// 模式处理按键后的动作。
+/// 模式处理按键后的结果。
 pub enum ModeAction {
-    Nothing,
-    SwitchToEdit { initial_char: Option<char> },
-    SwitchToNavigation,
-    ScreenCommand(ScreenCommand),
+    Handled,
+    #[allow(dead_code)]
+    Unhandled,
+    SwitchMode(Box<dyn Mode>),
 }
 
 /// 选区类型：行选中 / 列选中 / 矩形区域（预留 Shift+方向键）。
 pub enum Selection {
     Row(usize),
     Column(usize),
-    Range { anchor: CellAddress, cursor: CellAddress },
+    Range {
+        anchor: CellAddress,
+        cursor: CellAddress,
+    },
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -27,22 +30,32 @@ pub enum ModeKind {
     Delete,
 }
 
+/// 页脚信息
+pub struct FooterLine {
+    pub hint: Option<Line<'static>>,
+    pub status: Option<Line<'static>>,
+}
+
+impl FooterLine {
+    pub fn none() -> Self {
+        Self {
+            hint: None,
+            status: None,
+        }
+    }
+}
+
 pub trait Mode {
     fn kind(&self) -> ModeKind;
 
     fn handle_key(&mut self, ctx: &mut TableContext, key: KeyEvent) -> ModeAction;
 
     /// 渲染模式专属内容（侧面板、编辑栏等），返回留给表格区域的 Rect。
-    fn render_frame(&self, frame: &mut Frame, area: Rect, ctx: &TableContext) -> Rect;
+    fn render(&self, frame: &mut Frame, area: Rect, ctx: &TableContext) -> Rect;
 
-    fn footer_hint(&self, ctx: &TableContext) -> Option<Line<'static>> {
+    fn footer(&self, ctx: &TableContext) -> FooterLine {
         let _ = ctx;
-        None
-    }
-
-    fn footer_status(&self, ctx: &TableContext) -> Option<Line<'static>> {
-        let _ = ctx;
-        None
+        FooterLine::none()
     }
 
     fn edit_buffer(&self) -> Option<&str> {

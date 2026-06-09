@@ -1,6 +1,6 @@
 use std::cell::Cell;
 
-use crate::{model::{cell::CellAddress, workbook::Workbook}, theme::Theme};
+use crate::{model::{cell::CellAddress, workbook::Workbook}, screen::ScreenCommand, theme::Theme};
 
 use super::mode::Selection;
 
@@ -15,11 +15,20 @@ pub struct TableContext {
     pub visible_rows: Cell<usize>,
     pub visible_cols: Cell<usize>,
     pub selection: Option<Selection>,
+    pub pending_command: Option<ScreenCommand>,
 }
 
 impl TableContext {
     pub fn save(&self) {
         let _ = self.wb.save(&self.path);
+    }
+
+    pub fn go_home(&mut self) {
+        self.pending_command = Some(ScreenCommand::GoHome);
+    }
+
+    pub fn take_pending_command(&mut self) -> Option<ScreenCommand> {
+        self.pending_command.take()
     }
 
     /// 滚动视口以确保光标可见
