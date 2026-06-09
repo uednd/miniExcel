@@ -4,8 +4,23 @@ use serde::{Deserialize, Serialize};
 
 use super::limits::MAX_COLUMNS;
 
-/// 单元格坐标（行，列）
-pub type Coord = (usize, usize);
+/// 单元格地址（行，列）
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct CellAddress {
+    pub row: usize,
+    pub col: usize,
+}
+
+impl CellAddress {
+    pub fn new(row: usize, col: usize) -> Self {
+        Self { row, col }
+    }
+
+    /// 转显示格式 (A1, B2...)
+    pub fn display(&self) -> String {
+        format!("{}{}", col_name(self.col), self.row + 1)
+    }
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Cell {
@@ -39,7 +54,4 @@ pub fn col_name(index: usize) -> &'static str {
     COL_NAMES.get(index).map(|s| s.as_str()).unwrap_or("?")
 }
 
-/// 行列索引转坐标(A1, B2)，用于 status_hint
-pub fn display_coord(row: usize, col: usize) -> String {
-    format!("{}{}", col_name(col), row + 1)
-}
+
