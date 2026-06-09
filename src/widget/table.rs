@@ -8,7 +8,7 @@ use ratatui::{
 
 use crate::{
     model::{
-        cell::{CellValue, col_name},
+        cell::{CellAddress, CellValue, col_name},
         workbook::Workbook,
     },
     screen::editor::Selection,
@@ -27,8 +27,7 @@ pub struct TableGridConfig<'a> {
     pub wb: &'a Workbook,
     pub scroll_col: usize,
     pub scroll_row: usize,
-    pub cursor_row: usize,
-    pub cursor_col: usize,
+    pub cursor: CellAddress,
     pub theme: Theme,
     pub edit_buffer: Option<&'a str>,
     pub selection: Option<&'a Selection>,
@@ -65,7 +64,7 @@ impl TableGrid {
         header_cells.push(Cell::from("").style(header_style));
         for ci in cfg.scroll_col..col_end {
             // 光标列高亮
-            let style = if ci == cfg.cursor_col {
+            let style = if ci == cfg.cursor.col {
                 selected_header_style
             } else {
                 header_style
@@ -80,7 +79,7 @@ impl TableGrid {
         // 数据行
         let mut rows: Vec<Row> = Vec::with_capacity(row_end.saturating_sub(cfg.scroll_row));
         for ri in cfg.scroll_row..row_end {
-            let label_style = if ri == cfg.cursor_row {
+            let label_style = if ri == cfg.cursor.row {
                 selected_header_style
             } else {
                 header_style
@@ -91,7 +90,7 @@ impl TableGrid {
                     .style(label_style),
             ];
             for ci in cfg.scroll_col..col_end {
-                let text = if ci == cfg.cursor_col && ri == cfg.cursor_row {
+                let text = if ci == cfg.cursor.col && ri == cfg.cursor.row {
                     // 编辑模式
                     if let Some(buffer) = cfg.edit_buffer {
                         if blink_visible() {
@@ -138,28 +137,28 @@ impl TableGrid {
 
         // 绘制选中单元格高亮边框（若光标在选中行/列内则跳过，避免边框重叠）
         let overlap = match cfg.selection {
-            Some(Selection::Row(r)) => *r == cfg.cursor_row,
-            Some(Selection::Column(c)) => *c == cfg.cursor_col,
+            Some(Selection::Row(r)) => *r == cfg.cursor.row,
+            Some(Selection::Column(c)) => *c == cfg.cursor.col,
             Some(Selection::Range { anchor, cursor }) => {
-                let c1 = anchor.0.min(cursor.0);
-                let c2 = anchor.0.max(cursor.0);
-                let r1 = anchor.1.min(cursor.1);
-                let r2 = anchor.1.max(cursor.1);
-                cfg.cursor_col >= c1 && cfg.cursor_col <= c2 && cfg.cursor_row >= r1 && cfg.cursor_row <= r2
+                let c1 = anchor.col.min(cursor.col);
+                let c2 = anchor.col.max(cursor.col);
+                let r1 = anchor.row.min(cursor.row);
+                let r2 = anchor.row.max(cursor.row);
+                cfg.cursor.col >= c1 && cfg.cursor.col <= c2 && cfg.cursor.row >= r1 && cfg.cursor.row <= r2
             }
             _ => false,
         };
         if !overlap
-            && cfg.cursor_row >= cfg.scroll_row
-            && cfg.cursor_row < cfg.scroll_row + visible_rows
-            && cfg.cursor_col >= cfg.scroll_col
-            && cfg.cursor_col < cfg.scroll_col + visible_cols
+            && cfg.cursor.row >= cfg.scroll_row
+            && cfg.cursor.row < cfg.scroll_row + visible_rows
+            && cfg.cursor.col >= cfg.scroll_col
+            && cfg.cursor.col < cfg.scroll_col + visible_cols
         {
             draw_cell_border(
                 frame,
                 area,
-                cfg.cursor_row - cfg.scroll_row,
-                cfg.cursor_col - cfg.scroll_col,
+                cfg.cursor.row - cfg.scroll_row,
+                cfg.cursor.col - cfg.scroll_col,
                 Style::default().fg(cfg.theme.accent),
             );
         }
@@ -284,10 +283,10 @@ fn draw_selection_border(
             }
         }
         Selection::Range { anchor, cursor } => {
-            let c1 = anchor.0.min(cursor.0);
-            let c2 = anchor.0.max(cursor.0);
-            let r1 = anchor.1.min(cursor.1);
-            let r2 = anchor.1.max(cursor.1);
+            let c1 = anchor.col.min(cursor.col);
+            let c2 = anchor.col.max(cursor.col);
+            let r1 = anchor.row.min(cursor.row);
+            let r2 = anchor.row.max(cursor.row);
             if r1 >= scroll_row + visible_rows || r2 < scroll_row {
                 return;
             }
@@ -323,7 +322,7 @@ fn draw_selection_border(
 
 /// 从 HashMap 读取单元格并转成显示字符串
 fn cell_text(wb: &Workbook, col: usize, row: usize) -> String {
-    if let Some(cell) = wb.get_cell((col, row)) {
+    if let Some(cell) = wb.get_cell(CellAddress { row, col }) {
         match &cell.value {
             CellValue::Number(n) => n.to_string(),
             CellValue::Text(t) => t.clone(),
