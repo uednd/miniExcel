@@ -7,11 +7,12 @@ use ratatui::{
     widgets::Block,
 };
 
+use crate::screen::EventResult;
 use crate::widget::selectable_list::{SelectableItem, SelectableList};
 
 use super::{
     context::TableContext,
-    mode::{FooterLine, Mode, ModeAction, ModeKind},
+    mode::{FooterLine, Mode, ModeCommand, ModeKind, ModeResult},
     navigation::NavigationMode,
 };
 
@@ -26,16 +27,16 @@ impl MenuMode {
         let items = vec![
             SelectableItem::new("保存", |ctx: &mut TableContext| {
                 ctx.save();
-                ModeAction::SwitchMode(Box::new(NavigationMode))
+                EventResult::Command(ModeCommand::SwitchMode(Box::new(NavigationMode)))
             }),
             SelectableItem::new("保存并退出", |ctx: &mut TableContext| {
                 ctx.save();
                 ctx.go_home();
-                ModeAction::Handled
+                EventResult::Handled
             }),
             SelectableItem::new("返回首页", |ctx: &mut TableContext| {
                 ctx.go_home();
-                ModeAction::Handled
+                EventResult::Handled
             }),
         ];
         Self {
@@ -49,24 +50,24 @@ impl Mode for MenuMode {
         ModeKind::Menu
     }
 
-    fn handle_key(&mut self, ctx: &mut TableContext, key: KeyEvent) -> ModeAction {
+    fn handle_key(&mut self, ctx: &mut TableContext, key: KeyEvent) -> ModeResult {
         match key.code {
             KeyCode::Up => {
                 self.list.handle_up();
-                ModeAction::Handled
+                EventResult::Handled
             }
             KeyCode::Down => {
                 self.list.handle_down();
-                ModeAction::Handled
+                EventResult::Handled
             }
             KeyCode::Enter => {
                 if let Some(action) = self.list.handle_enter(ctx) {
                     action
                 } else {
-                    ModeAction::Handled
+                    EventResult::Handled
                 }
             }
-            _ => ModeAction::Handled,
+            _ => EventResult::Handled,
         }
     }
 

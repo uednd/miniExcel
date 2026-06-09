@@ -14,11 +14,11 @@ use crate::{
     theme::Theme,
     widget::{
         logo::{LOGO_HEIGHT, Logo},
-        tabs::{TabAction, Tabs},
+        tabs::{TabCommand, Tabs},
     },
 };
 
-use super::{Screen, ScreenCommand};
+use super::{EventResult, Screen, ScreenCommand};
 
 pub struct MenuScreen {
     theme: Theme,
@@ -53,19 +53,19 @@ impl Screen for MenuScreen {
         self.tabs.render(frame, body_area);
     }
 
-    fn handle_key(&mut self, key: KeyEvent) -> Option<ScreenCommand> {
+    fn handle_key(&mut self, key: KeyEvent) -> EventResult<ScreenCommand> {
         match self.tabs.handle_key(key) {
-            Some(TabAction::Handled) => Some(ScreenCommand::Stay),
-            Some(TabAction::CreateTable(name)) => {
+            EventResult::Handled => EventResult::Handled,
+            EventResult::Command(TabCommand::CreateTable(name)) => {
                 let path = format!("{}/{}.mxlsx", self.cwd, name);
                 let wb = Workbook::new(name, MAX_COLUMNS, MAX_ROWS);
                 if wb.save(&path).is_ok() {
-                    Some(ScreenCommand::OpenEditor { path })
+                    EventResult::Command(ScreenCommand::OpenEditor { path })
                 } else {
-                    Some(ScreenCommand::Stay)
+                    EventResult::Handled
                 }
             }
-            None => Some(ScreenCommand::Stay),
+            EventResult::Ignored => EventResult::Handled,
         }
     }
 

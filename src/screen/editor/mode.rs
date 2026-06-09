@@ -3,22 +3,22 @@ use ratatui::{Frame, layout::Rect, text::Line};
 
 use super::context::TableContext;
 use crate::model::cell::CellAddress;
+use crate::screen::EventResult;
 
-/// 模式处理按键后的结果。
-pub enum ModeAction {
-    /// 按键已被当前模式处理，宿主应保持在当前屏幕。
-    Handled,
-    /// 当前模式不处理该按键，宿主可以继续交给外层逻辑。
-    #[allow(dead_code)]
-    Unhandled,
+/// 编辑器模式产生的命令。
+pub enum ModeCommand {
     /// 切换到另一个编辑器模式。
     SwitchMode(Box<dyn Mode>),
 }
+
+/// 编辑器模式处理按键后的结果。
+pub type ModeResult = EventResult<ModeCommand>;
 
 /// 表格选区。
 ///
 /// 行、列索引均从 0 开始。矩形选区保存锚点和当前光标，
 /// 使用方负责在需要时归一化端点顺序。
+#[derive(Clone, Copy)]
 pub enum Selection {
     Row(usize),
     Column(usize),
@@ -57,7 +57,7 @@ pub trait Mode {
     fn kind(&self) -> ModeKind;
 
     /// 处理一个按键事件。
-    fn handle_key(&mut self, ctx: &mut TableContext, key: KeyEvent) -> ModeAction;
+    fn handle_key(&mut self, ctx: &mut TableContext, key: KeyEvent) -> ModeResult;
 
     /// 渲染模式专属内容，并返回留给表格区域的区域。
     ///

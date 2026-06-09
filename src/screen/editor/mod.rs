@@ -20,12 +20,12 @@ use crate::{
 };
 
 pub use self::context::TableContext;
-pub use self::mode::{ModeAction, Selection};
+pub use self::mode::{ModeResult, Selection};
 pub use self::viewport::Viewport;
 
 use self::{host::ModeHost, navigation::NavigationMode};
 
-use super::{Screen, ScreenCommand};
+use super::{EventResult, Screen, ScreenCommand};
 
 pub struct TableScreen {
     ctx: TableContext,
@@ -43,14 +43,7 @@ impl TableScreen {
             Workbook::new(name, MAX_COLUMNS, MAX_ROWS)
         });
 
-        let ctx = TableContext {
-            theme,
-            path,
-            wb,
-            viewport: Viewport::new(),
-            selection: None,
-            pending_command: None,
-        };
+        let ctx = TableContext::new(theme, path, wb);
 
         Self {
             ctx,
@@ -66,7 +59,7 @@ impl Screen for TableScreen {
         let table_block = Block::default()
             .borders(ratatui::widgets::Borders::ALL)
             .border_style(Style::default().fg(self.ctx.theme.accent))
-            .title(format!(" {} ", self.ctx.wb.name));
+            .title(format!(" {} ", self.ctx.workbook_name()));
 
         let inner = table_block.inner(table_area);
         frame.render_widget(table_block, table_area);
@@ -76,12 +69,12 @@ impl Screen for TableScreen {
         self.ctx.viewport.update_visible(visible_rows, visible_cols);
 
         let edit_buffer = self.host.edit_buffer();
-        let selection = self.ctx.selection.as_ref();
+        let selection = self.ctx.selection();
         TableGrid::render(
             frame,
             inner,
             TableGridConfig {
-                wb: &self.ctx.wb,
+                wb: self.ctx.workbook(),
                 viewport: &self.ctx.viewport,
                 theme: self.ctx.theme,
                 edit_buffer,
@@ -90,29 +83,29 @@ impl Screen for TableScreen {
         );
     }
 
-    fn handle_key(&mut self, key: KeyEvent) -> Option<ScreenCommand> {
+    fn handle_key(&mut self, key: KeyEvent) -> EventResult<ScreenCommand> {
         self.host.handle_key(&mut self.ctx, key)
     }
 
-    fn handle_scroll(&mut self, event: MouseEvent) -> Option<ScreenCommand> {
+    fn handle_scroll(&mut self, event: MouseEvent) -> EventResult<ScreenCommand> {
         match event.kind {
             MouseEventKind::ScrollUp => {
                 self.ctx.viewport.scroll_up(3);
-                Some(ScreenCommand::Stay)
+                EventResult::Handled
             }
             MouseEventKind::ScrollDown => {
-                self.ctx.viewport.scroll_down(3, self.ctx.wb.rows);
-                Some(ScreenCommand::Stay)
+                self.ctx.viewport.scroll_down(3, self.ctx.row_count());
+                EventResult::Handled
             }
             MouseEventKind::ScrollLeft => {
                 self.ctx.viewport.scroll_left(1);
-                Some(ScreenCommand::Stay)
+                EventResult::Handled
             }
             MouseEventKind::ScrollRight => {
-                self.ctx.viewport.scroll_right(1, self.ctx.wb.columns);
-                Some(ScreenCommand::Stay)
+                self.ctx.viewport.scroll_right(1, self.ctx.column_count());
+                EventResult::Handled
             }
-            _ => None,
+            _ => EventResult::Ignored,
         }
     }
 

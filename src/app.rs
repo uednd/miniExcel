@@ -10,7 +10,7 @@ use ratatui::{
 
 use crate::{
     exit::ExitHandler,
-    screen::{Screen, ScreenCommand, home::MenuScreen},
+    screen::{EventResult, Screen, ScreenCommand, home::MenuScreen},
     theme::Theme,
     widget::footer::Footer,
 };
@@ -86,9 +86,13 @@ impl App {
                             | MouseEventKind::ScrollRight
                     ) =>
                 {
-                    if let Some(cmd) = self.active_screen.handle_scroll(mouse) {
-                        self.exit_handler.reset();
-                        self.process_cmd(cmd);
+                    match self.active_screen.handle_scroll(mouse) {
+                        EventResult::Ignored => {}
+                        EventResult::Handled => self.exit_handler.reset(),
+                        EventResult::Command(cmd) => {
+                            self.exit_handler.reset();
+                            self.process_cmd(cmd);
+                        }
                     }
                 }
                 _ => {}
@@ -101,15 +105,18 @@ impl App {
             self.exit_handler.press_ctrl_c();
             return;
         }
-        if let Some(cmd) = self.active_screen.handle_key(key) {
-            self.exit_handler.reset();
-            self.process_cmd(cmd);
+        match self.active_screen.handle_key(key) {
+            EventResult::Ignored => {}
+            EventResult::Handled => self.exit_handler.reset(),
+            EventResult::Command(cmd) => {
+                self.exit_handler.reset();
+                self.process_cmd(cmd);
+            }
         }
     }
 
     fn process_cmd(&mut self, cmd: ScreenCommand) {
         match cmd {
-            ScreenCommand::Stay => {}
             ScreenCommand::OpenEditor { path } => {
                 self.active_screen =
                     Box::new(super::screen::editor::TableScreen::new(self.theme, path));

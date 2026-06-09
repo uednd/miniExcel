@@ -72,11 +72,26 @@ impl Workbook {
         self.cells.get(&addr)
     }
 
-    /// 写入指定地址的单元格。
+    /// 写入指定地址的文本。
     ///
-    /// 该方法不检查地址是否越界，调用者负责传入合法地址。
-    pub fn set_cell(&mut self, addr: CellAddress, raw: String, value: CellValue) {
-        self.cells.insert(addr, Cell { raw, value });
+    /// 该方法不检查地址是否越界，调用者负责传入合法地址。空文本会清除单元格。
+    pub fn set_text(&mut self, addr: CellAddress, raw: String) {
+        if raw.is_empty() {
+            self.clear_cell(addr);
+        } else {
+            self.cells.insert(
+                addr,
+                Cell {
+                    value: CellValue::Text(raw.clone()),
+                    raw,
+                },
+            );
+        }
+    }
+
+    /// 清除指定地址的单元格内容。
+    pub fn clear_cell(&mut self, addr: CellAddress) {
+        self.cells.remove(&addr);
     }
 
     /// 删除指定行，该行上方的行不动，下方行上移，总行数减一。

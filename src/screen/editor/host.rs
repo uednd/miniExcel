@@ -1,20 +1,20 @@
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{Frame, layout::Rect};
 
-use crate::screen::ScreenCommand;
+use crate::screen::{EventResult, ScreenCommand};
 
 use super::{
     context::TableContext,
     delete::DeleteMode,
     menu::MenuMode,
-    mode::{FooterLine, Mode, ModeAction, ModeKind},
+    mode::{FooterLine, Mode, ModeCommand, ModeKind},
     navigation::NavigationMode,
 };
 
 /// 编辑器模式宿主。
 ///
 /// 宿主先处理跨模式快捷键，再把按键交给当前模式。
-/// 当前模式返回 `Handled` 时，宿主会向外层返回 `ScreenCommand::Stay`，
+/// 当前模式返回 `Handled` 时，宿主也会向外层返回 `Handled`，
 /// 让应用主循环知道该事件已经被消费。
 pub struct ModeHost {
     mode: Box<dyn Mode>,
@@ -33,16 +33,22 @@ impl ModeHost {
     }
 
     /// 处理按键并转换为屏幕命令。
-    pub fn handle_key(&mut self, ctx: &mut TableContext, key: KeyEvent) -> Option<ScreenCommand> {
-        if let Some(cmd) = self.intercept_shortcut(ctx, key) {
-            return Some(cmd);
+    pub fn handle_key(
+        &mut self,
+        ctx: &mut TableContext,
+        key: KeyEvent,
+    ) -> EventResult<ScreenCommand> {
+        if let Some(result) = self.intercept_shortcut(ctx, key) {
+            return result;
         }
         match self.mode.handle_key(ctx, key) {
-            ModeAction::Handled => ctx.take_pending_command().or(Some(ScreenCommand::Stay)),
-            ModeAction::Unhandled => None,
-            ModeAction::SwitchMode(new_mode) => {
+            EventResult::Handled => ctx
+                .take_pending_command()
+                .map_or(EventResult::Handled, EventResult::Command),
+            EventResult::Ignored => EventResult::Ignored,
+            EventResult::Command(ModeCommand::SwitchMode(new_mode)) => {
                 self.mode = new_mode;
-                Some(ScreenCommand::Stay)
+                EventResult::Handled
             }
         }
     }
@@ -66,27 +72,27 @@ impl ModeHost {
         &mut self,
         ctx: &mut TableContext,
         key: KeyEvent,
-    ) -> Option<ScreenCommand> {
+    ) -> Option<EventResult<ScreenCommand>> {
         if Self::is_ctrl_s(key)
             && self.mode.kind() != ModeKind::Menu
             && self.mode.kind() != ModeKind::Delete
         {
             ctx.save();
-            return Some(ScreenCommand::Stay);
+            return Some(EventResult::Handled);
         }
         if Self::is_ctrl_p(key) {
             self.mode = match self.mode.kind() {
                 ModeKind::Menu | ModeKind::Delete => Box::new(NavigationMode),
                 _ => Box::new(MenuMode::new()),
             };
-            return Some(ScreenCommand::Stay);
+            return Some(EventResult::Handled);
         }
         if Self::is_ctrl_d(key)
             && self.mode.kind() != ModeKind::Menu
             && self.mode.kind() != ModeKind::Delete
         {
             self.mode = Box::new(DeleteMode::new());
-            return Some(ScreenCommand::Stay);
+            return Some(EventResult::Handled);
         }
         None
     }

@@ -7,11 +7,11 @@ use ratatui::{
     widgets::Paragraph,
 };
 
-use crate::{model::cell::CellValue, util::cursor_span};
+use crate::{screen::EventResult, util::cursor_span};
 
 use super::{
     context::TableContext,
-    mode::{FooterLine, Mode, ModeAction, ModeKind},
+    mode::{FooterLine, Mode, ModeCommand, ModeKind, ModeResult},
     navigation::NavigationMode,
 };
 
@@ -35,28 +35,22 @@ impl Mode for EditMode {
         ModeKind::Edit
     }
 
-    fn handle_key(&mut self, ctx: &mut TableContext, key: KeyEvent) -> ModeAction {
+    fn handle_key(&mut self, ctx: &mut TableContext, key: KeyEvent) -> ModeResult {
         match key.code {
             KeyCode::Enter => {
-                if !self.buffer.is_empty() {
-                    ctx.wb.set_cell(
-                        ctx.viewport.cursor(),
-                        self.buffer.clone(),
-                        CellValue::Text(self.buffer.clone()),
-                    );
-                }
-                ModeAction::SwitchMode(Box::new(NavigationMode))
+                ctx.set_current_cell_text(self.buffer.clone());
+                EventResult::Command(ModeCommand::SwitchMode(Box::new(NavigationMode)))
             }
-            KeyCode::Esc => ModeAction::SwitchMode(Box::new(NavigationMode)),
+            KeyCode::Esc => EventResult::Command(ModeCommand::SwitchMode(Box::new(NavigationMode))),
             KeyCode::Backspace => {
                 self.buffer.pop();
-                ModeAction::Handled
+                EventResult::Handled
             }
             KeyCode::Char(c) => {
                 self.buffer.push(c);
-                ModeAction::Handled
+                EventResult::Handled
             }
-            _ => ModeAction::Handled,
+            _ => EventResult::Handled,
         }
     }
 

@@ -7,11 +7,12 @@ use ratatui::{
     widgets::Block,
 };
 
+use crate::screen::EventResult;
 use crate::widget::selectable_list::{SelectableItem, SelectableList};
 
 use super::{
     context::TableContext,
-    mode::{FooterLine, Mode, ModeAction, ModeKind},
+    mode::{FooterLine, Mode, ModeCommand, ModeKind, ModeResult},
     navigation::NavigationMode,
 };
 
@@ -28,11 +29,11 @@ impl DeleteMode {
         let items = vec![
             SelectableItem::new("删除整行", |ctx: &mut TableContext| {
                 ctx.delete_current_row();
-                ModeAction::SwitchMode(Box::new(NavigationMode))
+                EventResult::Command(ModeCommand::SwitchMode(Box::new(NavigationMode)))
             }),
             SelectableItem::new("删除整列", |ctx: &mut TableContext| {
                 ctx.delete_current_column();
-                ModeAction::SwitchMode(Box::new(NavigationMode))
+                EventResult::Command(ModeCommand::SwitchMode(Box::new(NavigationMode)))
             }),
         ];
         Self {
@@ -46,25 +47,25 @@ impl Mode for DeleteMode {
         ModeKind::Delete
     }
 
-    fn handle_key(&mut self, ctx: &mut TableContext, key: KeyEvent) -> ModeAction {
+    fn handle_key(&mut self, ctx: &mut TableContext, key: KeyEvent) -> ModeResult {
         match key.code {
             KeyCode::Up => {
                 self.list.handle_up();
-                ModeAction::Handled
+                EventResult::Handled
             }
             KeyCode::Down => {
                 self.list.handle_down();
-                ModeAction::Handled
+                EventResult::Handled
             }
             KeyCode::Enter => {
                 if let Some(action) = self.list.handle_enter(ctx) {
                     action
                 } else {
-                    ModeAction::Handled
+                    EventResult::Handled
                 }
             }
-            KeyCode::Esc => ModeAction::SwitchMode(Box::new(NavigationMode)),
-            _ => ModeAction::Handled,
+            KeyCode::Esc => EventResult::Command(ModeCommand::SwitchMode(Box::new(NavigationMode))),
+            _ => EventResult::Handled,
         }
     }
 

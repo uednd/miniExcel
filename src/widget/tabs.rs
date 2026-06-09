@@ -7,11 +7,11 @@ use ratatui::{
     widgets::{Block, Paragraph},
 };
 
+use crate::screen::EventResult;
 use crate::{theme::Theme, widget::input::Input};
 
 #[derive(Debug, PartialEq, Eq)]
-pub enum TabAction {
-    Handled, // 内部已处理，无需调用方
+pub enum TabCommand {
     CreateTable(String),
 }
 
@@ -68,11 +68,11 @@ impl Tabs {
         self.pages[self.selected].render(frame, tab_content_area, self.theme);
     }
 
-    pub fn handle_key(&mut self, key: KeyEvent) -> Option<TabAction> {
+    pub fn handle_key(&mut self, key: KeyEvent) -> EventResult<TabCommand> {
         match key.code {
             KeyCode::Tab => {
                 self.next();
-                Some(TabAction::Handled)
+                EventResult::Handled
             }
             // 由当前 Tab content 处理
             _ => self.pages[self.selected].handle_key(key),
@@ -162,24 +162,24 @@ impl TabPage {
         }
     }
 
-    fn handle_key(&mut self, key: KeyEvent) -> Option<TabAction> {
+    fn handle_key(&mut self, key: KeyEvent) -> EventResult<TabCommand> {
         match self {
             TabPage::NewTable(_, input) => match key.code {
                 KeyCode::Enter => {
                     let name = table_name(input);
-                    Some(TabAction::CreateTable(name))
+                    EventResult::Command(TabCommand::CreateTable(name))
                 }
                 KeyCode::Backspace => {
                     input.delete_char();
-                    Some(TabAction::Handled)
+                    EventResult::Handled
                 }
                 KeyCode::Char(c) => {
                     input.insert_char(c);
-                    Some(TabAction::Handled)
+                    EventResult::Handled
                 }
-                _ => None,
+                _ => EventResult::Ignored,
             },
-            _ => None,
+            _ => EventResult::Ignored,
         }
     }
 }

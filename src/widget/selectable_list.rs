@@ -7,7 +7,7 @@ use ratatui::{
 };
 
 use crate::{
-    screen::editor::{ModeAction, TableContext},
+    screen::editor::{ModeResult, TableContext},
     theme::Theme,
 };
 
@@ -17,14 +17,14 @@ use crate::{
 /// 不是独立于编辑器的通用列表项。
 pub struct SelectableItem {
     pub label: String,
-    pub action: Box<dyn Fn(&mut TableContext) -> ModeAction>,
+    pub action: Box<dyn Fn(&mut TableContext) -> ModeResult>,
 }
 
 impl SelectableItem {
     /// 创建一个带标签和执行动作的列表项。
     pub fn new(
         label: impl Into<String>,
-        action: impl Fn(&mut TableContext) -> ModeAction + 'static,
+        action: impl Fn(&mut TableContext) -> ModeResult + 'static,
     ) -> Self {
         Self {
             label: label.into(),
@@ -66,7 +66,7 @@ impl SelectableList {
     /// 执行当前选中项的动作。
     ///
     /// 如果列表为空，返回 `None`。
-    pub fn handle_enter(&self, ctx: &mut TableContext) -> Option<ModeAction> {
+    pub fn handle_enter(&self, ctx: &mut TableContext) -> Option<ModeResult> {
         self.items.get(self.selected).map(|item| (item.action)(ctx))
     }
 
