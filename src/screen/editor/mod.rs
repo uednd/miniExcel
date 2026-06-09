@@ -18,7 +18,7 @@ use crate::{
 };
 
 pub use self::context::TableContext;
-pub use self::mode::{ModeAction, ModeKind};
+pub use self::mode::{ModeAction, ModeKind, Selection};
 
 use self::{
     delete::DeleteMode,
@@ -60,7 +60,7 @@ impl TableScreen {
 
         Self {
             ctx,
-            mode: Box::new(NavigationMode),
+            mode: Box::new(NavigationMode::new()),
         }
     }
 }
@@ -78,6 +78,7 @@ impl Screen for TableScreen {
         frame.render_widget(table_block, table_area);
 
         let edit_buffer = self.mode.edit_buffer();
+        let selection = self.mode.selection();
         let (visible_rows, visible_cols) = TableGrid::render(
             frame,
             inner,
@@ -89,6 +90,7 @@ impl Screen for TableScreen {
                 cursor_col: self.ctx.cursor_col,
                 theme: self.ctx.theme,
                 edit_buffer,
+                selection,
             },
         );
         self.ctx.visible_rows.set(visible_rows);
@@ -109,7 +111,7 @@ impl Screen for TableScreen {
         // Ctrl+P: 切换菜单面板
         if key.code == KeyCode::Char('p') && key.modifiers.contains(KeyModifiers::CONTROL) {
             self.mode = match self.mode.kind() {
-                ModeKind::Menu | ModeKind::Delete => Box::new(NavigationMode),
+                ModeKind::Menu | ModeKind::Delete => Box::new(NavigationMode::new()),
                 _ => Box::new(MenuMode::new()),
             };
             return Some(ScreenCommand::Stay);
@@ -138,7 +140,7 @@ impl Screen for TableScreen {
                 Some(ScreenCommand::Stay)
             }
             ModeAction::SwitchToNavigation => {
-                self.mode = Box::new(NavigationMode);
+                self.mode = Box::new(NavigationMode::new());
                 Some(ScreenCommand::Stay)
             }
             ModeAction::ScreenCommand(cmd) => Some(cmd),

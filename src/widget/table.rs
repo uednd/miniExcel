@@ -11,6 +11,7 @@ use crate::{
         cell::{CellValue, col_name},
         workbook::Workbook,
     },
+    screen::editor::Selection,
     theme::Theme,
     util::blink_visible,
 };
@@ -30,6 +31,7 @@ pub struct TableGridConfig<'a> {
     pub cursor_col: usize,
     pub theme: Theme,
     pub edit_buffer: Option<&'a str>,
+    pub selection: Option<&'a Selection>,
 }
 
 impl TableGrid {
@@ -121,8 +123,34 @@ impl TableGrid {
 
         draw_grid(frame, area, visible_cols, grid_style);
 
-        // 绘制选中单元格高亮边框
-        if cfg.cursor_row >= cfg.scroll_row
+        // 绘制选中行/列边框
+        if let Some(sel) = cfg.selection {
+            draw_selection_border(
+                frame,
+                area,
+                sel,
+                cfg.scroll_row,
+                cfg.scroll_col,
+                (row_end - cfg.scroll_row, col_end - cfg.scroll_col),
+                Style::default().fg(cfg.theme.accent),
+            );
+        }
+
+        // 绘制选中单元格高亮边框（若光标在选中行/列内则跳过，避免边框重叠）
+        let overlap = match cfg.selection {
+            Some(Selection::Row(r)) => *r == cfg.cursor_row,
+            Some(Selection::Column(c)) => *c == cfg.cursor_col,
+            Some(Selection::Range { anchor, cursor }) => {
+                let c1 = anchor.0.min(cursor.0);
+                let c2 = anchor.0.max(cursor.0);
+                let r1 = anchor.1.min(cursor.1);
+                let r2 = anchor.1.max(cursor.1);
+                cfg.cursor_col >= c1 && cfg.cursor_col <= c2 && cfg.cursor_row >= r1 && cfg.cursor_row <= r2
+            }
+            _ => false,
+        };
+        if !overlap
+            && cfg.cursor_row >= cfg.scroll_row
             && cfg.cursor_row < cfg.scroll_row + visible_rows
             && cfg.cursor_col >= cfg.scroll_col
             && cfg.cursor_col < cfg.scroll_col + visible_cols
@@ -210,6 +238,87 @@ fn draw_cell_border(
     }
     buffer[(left, content)].set_symbol("┃").set_style(style);
     buffer[(right, content)].set_symbol("┃").set_style(style);
+}
+
+/// 绘制选中行/列的边框，覆盖在网格线之上、光标单元格边框之下。
+fn draw_selection_border(
+    frame: &mut Frame,
+    area: Rect,
+    selection: &Selection,
+    scroll_row: usize,
+    scroll_col: usize,
+    visible_range: (usize, usize),
+    style: Style,
+) {
+    let buffer = frame.buffer_mut();
+    let (visible_rows, visible_cols) = visible_range;
+    match *selection {
+        Selection::Row(r) => {
+            if r < scroll_row || r >= scroll_row + visible_rows {
+                return;
+            }
+            let top = area.y + 1 + (r - scroll_row) as u16 * 2;
+            let bottom = top + 2;
+            if bottom >= area.bottom() {
+                return;
+            }
+            for x in area.x..col_grid_x(area, visible_cols).min(area.right()) {
+                buffer[(x, top)].set_symbol("━").set_style(style);
+                buffer[(x, bottom)].set_symbol("━").set_style(style);
+            }
+        }
+        Selection::Column(c) => {
+            if c < scroll_col || c >= scroll_col + visible_cols {
+                return;
+            }
+            let left = col_grid_x(area, c - scroll_col);
+            let right = col_grid_x(area, c - scroll_col + 1);
+            let top = area.y;
+            let bottom = (area.y + 1 + visible_rows as u16 * 2).min(area.bottom());
+            if left >= right || right > area.right() {
+                return;
+            }
+            for y in top..bottom {
+                buffer[(left, y)].set_symbol("┃").set_style(style);
+                buffer[(right, y)].set_symbol("┃").set_style(style);
+            }
+        }
+        Selection::Range { anchor, cursor } => {
+            let c1 = anchor.0.min(cursor.0);
+            let c2 = anchor.0.max(cursor.0);
+            let r1 = anchor.1.min(cursor.1);
+            let r2 = anchor.1.max(cursor.1);
+            if r1 >= scroll_row + visible_rows || r2 < scroll_row {
+                return;
+            }
+            if c1 >= scroll_col + visible_cols || c2 < scroll_col {
+                return;
+            }
+            let vis_c1 = c1.max(scroll_col) - scroll_col;
+            let vis_c2 = c2.min(scroll_col + visible_cols - 1) - scroll_col;
+            let vis_r1 = r1.max(scroll_row) - scroll_row;
+            let vis_r2 = r2.min(scroll_row + visible_rows - 1) - scroll_row;
+            let top = area.y + 1 + vis_r1 as u16 * 2;
+            let bottom = area.y + 1 + vis_r2 as u16 * 2 + 2;
+            let left = col_grid_x(area, vis_c1);
+            let right = col_grid_x(area, vis_c2 + 1);
+            if left >= right || right > area.right() || bottom > area.bottom() {
+                return;
+            }
+            buffer[(left, top)].set_symbol("┏").set_style(style);
+            buffer[(right, top)].set_symbol("┓").set_style(style);
+            buffer[(left, bottom)].set_symbol("┗").set_style(style);
+            buffer[(right, bottom)].set_symbol("┛").set_style(style);
+            for x in left + 1..right {
+                buffer[(x, top)].set_symbol("━").set_style(style);
+                buffer[(x, bottom)].set_symbol("━").set_style(style);
+            }
+            for y in top + 1..bottom {
+                buffer[(left, y)].set_symbol("┃").set_style(style);
+                buffer[(right, y)].set_symbol("┃").set_style(style);
+            }
+        }
+    }
 }
 
 /// 从 HashMap 读取单元格并转成显示字符串

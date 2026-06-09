@@ -12,6 +12,14 @@ pub enum ModeAction {
     ScreenCommand(ScreenCommand),
 }
 
+/// 选区类型：行选中 / 列选中 / 矩形区域（预留 Shift+方向键）。
+pub enum Selection {
+    Row(usize),
+    Column(usize),
+    #[allow(dead_code)]
+    Range { anchor: (usize, usize), cursor: (usize, usize) },
+}
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum ModeKind {
     Navigation,
@@ -39,6 +47,11 @@ pub trait Mode {
     }
 
     fn edit_buffer(&self) -> Option<&str> {
+        None
+    }
+
+    /// 当前选中区域，仅 NavigationMode 返回非 None。
+    fn selection(&self) -> Option<&Selection> {
         None
     }
 }

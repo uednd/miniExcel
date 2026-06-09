@@ -79,4 +79,23 @@ impl Workbook {
         self.cells = new_cells;
         self.columns -= 1;
     }
+
+    /// 清空指定行所有单元格内容。
+    pub fn clear_row(&mut self, r: usize) {
+        self.cells.retain(|&(_, row), _| row != r);
+    }
+
+    /// 清空指定列所有单元格内容。
+    pub fn clear_column(&mut self, c: usize) {
+        self.cells.retain(|&(col, _), _| col != c);
+    }
+
+    /// 清空矩形区域内所有单元格内容。
+    pub fn clear_range(&mut self, c1: usize, r1: usize, c2: usize, r2: usize) {
+        let (c_min, c_max) = (c1.min(c2), c1.max(c2));
+        let (r_min, r_max) = (r1.min(r2), r1.max(r2));
+        self.cells.retain(|&(col, row), _| {
+            col < c_min || col > c_max || row < r_min || row > r_max
+        });
+    }
 }

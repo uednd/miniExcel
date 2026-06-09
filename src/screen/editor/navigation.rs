@@ -3,7 +3,7 @@ use ratatui::{Frame, layout::Rect, style::Style, text::Line};
 
 use super::{
     context::TableContext,
-    mode::{Mode, ModeAction, ModeKind},
+    mode::{Mode, ModeAction, ModeKind, Selection},
 };
 
 enum NavigationKey {
@@ -14,7 +14,15 @@ enum NavigationKey {
 }
 
 /// 默认模式 —— 光标导航、单元格删除、进入编辑。
-pub struct NavigationMode;
+pub struct NavigationMode {
+    selection: Option<Selection>,
+}
+
+impl NavigationMode {
+    pub fn new() -> Self {
+        Self { selection: None }
+    }
+}
 
 impl Mode for NavigationMode {
     fn kind(&self) -> ModeKind {
@@ -22,18 +30,113 @@ impl Mode for NavigationMode {
     }
 
     fn handle_key(&mut self, ctx: &mut TableContext, key: KeyEvent) -> ModeAction {
-        if let Some(nav) = Self::parse_direction(key) {
-            match nav {
-                NavigationKey::Up if ctx.cursor_row > 0 => ctx.cursor_row -= 1,
-                NavigationKey::Down if ctx.cursor_row + 1 < ctx.wb.rows => ctx.cursor_row += 1,
-                NavigationKey::Left if ctx.cursor_col > 0 => ctx.cursor_col -= 1,
-                NavigationKey::Right if ctx.cursor_col + 1 < ctx.wb.columns => ctx.cursor_col += 1,
-                _ => {}
+        // --- 选中模式下的按键处理 ---
+        if let Some(ref sel) = self.selection {
+            // Range 选中：Shift+方向键扩展选区
+            if let Some(nav) = Self::parse_shift_direction(key)
+                && let Selection::Range { anchor, .. } = *sel
+            {
+                Self::apply_direction(ctx, nav);
+                self.selection = Some(Selection::Range {
+                    anchor,
+                    cursor: (ctx.cursor_col, ctx.cursor_row),
+                });
+                return ModeAction::Nothing;
             }
-            ctx.scroll_into_view();
+
+            match (key.code, sel) {
+                // Esc 退出选中
+                (KeyCode::Esc, _) => {
+                    self.selection = None;
+                    return ModeAction::Nothing;
+                }
+                // Delete/Backspace: 清空选中内容
+                (KeyCode::Delete | KeyCode::Backspace, Selection::Row(r)) => {
+                    ctx.wb.clear_row(*r);
+                    self.selection = None;
+                    return ModeAction::Nothing;
+                }
+                (KeyCode::Delete | KeyCode::Backspace, Selection::Column(c)) => {
+                    ctx.wb.clear_column(*c);
+                    self.selection = None;
+                    return ModeAction::Nothing;
+                }
+                (
+                    KeyCode::Delete | KeyCode::Backspace,
+                    Selection::Range { anchor, cursor },
+                ) => {
+                    ctx.wb
+                        .clear_range(anchor.0, anchor.1, cursor.0, cursor.1);
+                    self.selection = None;
+                    return ModeAction::Nothing;
+                }
+                // 同快捷键再次按退出选中（仅 Row/Column）
+                (KeyCode::Left | KeyCode::Right, Selection::Row(_))
+                    if key
+                        .modifiers
+                        .contains(KeyModifiers::CONTROL | KeyModifiers::SHIFT) =>
+                {
+                    self.selection = None;
+                    return ModeAction::Nothing;
+                }
+                (KeyCode::Up | KeyCode::Down, Selection::Column(_))
+                    if key
+                        .modifiers
+                        .contains(KeyModifiers::CONTROL | KeyModifiers::SHIFT) =>
+                {
+                    self.selection = None;
+                    return ModeAction::Nothing;
+                }
+                // 方向键退出选中并执行移动
+                _ if Self::parse_direction(key).is_some() => {
+                    let nav = Self::parse_direction(key).unwrap();
+                    self.selection = None;
+                    Self::apply_direction(ctx, nav);
+                    return ModeAction::Nothing;
+                }
+                _ => return ModeAction::Nothing,
+            }
+        }
+
+        // --- 非选中模式：Shift+方向键创建 Range 选区 ---
+        if let Some(nav) = Self::parse_shift_direction(key) {
+            let anchor = (ctx.cursor_col, ctx.cursor_row);
+            Self::apply_direction(ctx, nav);
+            self.selection = Some(Selection::Range {
+                anchor,
+                cursor: (ctx.cursor_col, ctx.cursor_row),
+            });
             return ModeAction::Nothing;
         }
 
+        // --- 非选中模式：方向键 ---
+        if let Some(nav) = Self::parse_direction(key) {
+            Self::apply_direction(ctx, nav);
+            return ModeAction::Nothing;
+        }
+
+        // --- 非选中模式：选区快捷键（Ctrl+Shift+方向键） ---
+        match key.code {
+            KeyCode::Left | KeyCode::Right
+                if key
+                    .modifiers
+                    .contains(KeyModifiers::CONTROL | KeyModifiers::SHIFT) =>
+            {
+                self.selection = Some(Selection::Row(ctx.cursor_row));
+                return ModeAction::Nothing;
+            }
+            KeyCode::Up | KeyCode::Down
+                if key
+                    .modifiers
+                    .contains(KeyModifiers::CONTROL | KeyModifiers::SHIFT) =>
+            {
+                self.selection = Some(Selection::Column(ctx.cursor_col));
+                return ModeAction::Nothing;
+            }
+            _ => {}
+        }
+
+        // --- 原有逻辑 ---
         match key.code {
             KeyCode::Enter => ModeAction::SwitchToEdit { initial_char: None },
             KeyCode::Char(c) => ModeAction::SwitchToEdit {
@@ -53,6 +156,10 @@ impl Mode for NavigationMode {
 
     fn render_frame(&self, _frame: &mut Frame, area: Rect, _ctx: &TableContext) -> Rect {
         area
+    }
+
+    fn selection(&self) -> Option<&Selection> {
+        self.selection.as_ref()
     }
 
     fn footer_hint(&self, ctx: &TableContext) -> Option<Line<'static>> {
@@ -95,5 +202,32 @@ impl NavigationMode {
             KeyCode::Right => Some(NavigationKey::Right),
             _ => None,
         }
+    }
+
+    /// 仅捕获 Shift+方向键（不含 Ctrl），用于框选。
+    fn parse_shift_direction(key: KeyEvent) -> Option<NavigationKey> {
+        if !key.modifiers.contains(KeyModifiers::SHIFT)
+            || key.modifiers.contains(KeyModifiers::CONTROL)
+        {
+            return None;
+        }
+        match key.code {
+            KeyCode::Up => Some(NavigationKey::Up),
+            KeyCode::Down => Some(NavigationKey::Down),
+            KeyCode::Left => Some(NavigationKey::Left),
+            KeyCode::Right => Some(NavigationKey::Right),
+            _ => None,
+        }
+    }
+
+    fn apply_direction(ctx: &mut TableContext, nav: NavigationKey) {
+        match nav {
+            NavigationKey::Up if ctx.cursor_row > 0 => ctx.cursor_row -= 1,
+            NavigationKey::Down if ctx.cursor_row + 1 < ctx.wb.rows => ctx.cursor_row += 1,
+            NavigationKey::Left if ctx.cursor_col > 0 => ctx.cursor_col -= 1,
+            NavigationKey::Right if ctx.cursor_col + 1 < ctx.wb.columns => ctx.cursor_col += 1,
+            _ => {}
+        }
+        ctx.scroll_into_view();
     }
 }
