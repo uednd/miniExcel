@@ -17,6 +17,7 @@ pub enum ModeKind {
     Navigation,
     Edit,
     Menu,
+    Delete,
 }
 
 pub trait Mode {

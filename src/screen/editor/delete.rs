@@ -7,35 +7,39 @@ use ratatui::{
     widgets::Block,
 };
 
-use crate::{
-    screen::ScreenCommand,
-    widget::selectable_list::{SelectableItem, SelectableList},
-};
+use crate::widget::selectable_list::{SelectableItem, SelectableList};
 
 use super::{
     context::TableContext,
     mode::{Mode, ModeAction, ModeKind},
 };
 
-const MENU_WIDTH: u16 = 20;
+const PANEL_WIDTH: u16 = 20;
 
-pub struct MenuMode {
+/// 删除面板：通过 SelectableList 提供删除整行/整列操作。
+/// 由 Ctrl+D 触发，Enter 执行选中操作，Esc 关闭。
+pub struct DeleteMode {
     list: SelectableList,
 }
 
-impl MenuMode {
+impl DeleteMode {
     pub fn new() -> Self {
         let items = vec![
-            SelectableItem::new("保存", |ctx: &mut TableContext| {
-                ctx.save();
+            SelectableItem::new("删除整行", |ctx: &mut TableContext| {
+                ctx.wb.delete_row(ctx.cursor_row);
+                if ctx.cursor_row >= ctx.wb.rows {
+                    ctx.cursor_row = ctx.wb.rows.saturating_sub(1);
+                }
+                ctx.scroll_into_view();
                 ModeAction::SwitchToNavigation
             }),
-            SelectableItem::new("保存并退出", |ctx: &mut TableContext| {
-                ctx.save();
-                ModeAction::ScreenCommand(ScreenCommand::GoHome)
-            }),
-            SelectableItem::new("返回首页", |_ctx| {
-                ModeAction::ScreenCommand(ScreenCommand::GoHome)
+            SelectableItem::new("删除整列", |ctx: &mut TableContext| {
+                ctx.wb.delete_column(ctx.cursor_col);
+                if ctx.cursor_col >= ctx.wb.columns {
+                    ctx.cursor_col = ctx.wb.columns.saturating_sub(1);
+                }
+                ctx.scroll_into_view();
+                ModeAction::SwitchToNavigation
             }),
         ];
         Self {
@@ -44,9 +48,9 @@ impl MenuMode {
     }
 }
 
-impl Mode for MenuMode {
+impl Mode for DeleteMode {
     fn kind(&self) -> ModeKind {
-        ModeKind::Menu
+        ModeKind::Delete
     }
 
     fn handle_key(&mut self, ctx: &mut TableContext, key: KeyEvent) -> ModeAction {
@@ -66,17 +70,19 @@ impl Mode for MenuMode {
                     ModeAction::Nothing
                 }
             }
+            KeyCode::Esc => ModeAction::SwitchToNavigation,
             _ => ModeAction::Nothing,
         }
     }
 
     fn render_frame(&self, frame: &mut Frame, area: Rect, ctx: &TableContext) -> Rect {
-        let [table_area, menu_area] =
-            Layout::horizontal([Constraint::Fill(1), Constraint::Length(MENU_WIDTH)]).areas(area);
+        let [table_area, panel_area] =
+            Layout::horizontal([Constraint::Fill(1), Constraint::Length(PANEL_WIDTH)]).areas(area);
 
-        let menu_block = Block::default().style(Style::default().bg(ctx.theme.surface_alt));
-        let inner = menu_block.inner(menu_area);
-        frame.render_widget(menu_block, menu_area);
+        let panel_block =
+            Block::default().style(Style::default().bg(ctx.theme.surface_alt)).title(Line::styled("删除", Style::default().fg(ctx.theme.accent)));
+        let inner = panel_block.inner(panel_area);
+        frame.render_widget(panel_block, panel_area);
         self.list.render(frame, inner, ctx.theme);
 
         table_area
@@ -91,8 +97,8 @@ impl Mode for MenuMode {
             Span::styled("Enter", Style::default().fg(ctx.theme.accent)),
             Span::styled(" 确认", Style::default().fg(ctx.theme.text_dim)),
             Span::styled("  ", Style::default().fg(ctx.theme.text_dim)),
-            Span::styled("Ctrl+P", Style::default().fg(ctx.theme.accent)),
-            Span::styled(" 关闭", Style::default().fg(ctx.theme.text_dim)),
+            Span::styled("Esc", Style::default().fg(ctx.theme.accent)),
+            Span::styled(" 取消", Style::default().fg(ctx.theme.text_dim)),
         ]))
     }
 }

@@ -1,4 +1,5 @@
 mod context;
+mod delete;
 mod edit;
 mod menu;
 mod mode;
@@ -16,11 +17,14 @@ use crate::{
     widget::table::{TableGrid, TableGridConfig},
 };
 
+pub use self::context::TableContext;
+pub use self::mode::{ModeAction, ModeKind};
+
 use self::{
-    context::TableContext,
+    delete::DeleteMode,
     edit::EditMode,
     menu::MenuMode,
-    mode::{Mode, ModeAction, ModeKind},
+    mode::Mode,
     navigation::NavigationMode,
 };
 
@@ -92,19 +96,32 @@ impl Screen for TableScreen {
     }
 
     fn handle_key(&mut self, key: KeyEvent) -> Option<ScreenCommand> {
+        // Ctrl+S: 保存工作簿（菜单模式下不拦截，由菜单自身处理）
         if key.code == KeyCode::Char('s')
             && key.modifiers.contains(KeyModifiers::CONTROL)
             && self.mode.kind() != ModeKind::Menu
+            && self.mode.kind() != ModeKind::Delete
         {
             self.ctx.save();
             return Some(ScreenCommand::Stay);
         }
 
+        // Ctrl+P: 切换菜单面板
         if key.code == KeyCode::Char('p') && key.modifiers.contains(KeyModifiers::CONTROL) {
             self.mode = match self.mode.kind() {
-                ModeKind::Menu => Box::new(NavigationMode),
+                ModeKind::Menu | ModeKind::Delete => Box::new(NavigationMode),
                 _ => Box::new(MenuMode::new()),
             };
+            return Some(ScreenCommand::Stay);
+        }
+
+        // Ctrl+D: 打开删除面板（仅在导航和编辑模式下可用）
+        if key.code == KeyCode::Char('d')
+            && key.modifiers.contains(KeyModifiers::CONTROL)
+            && self.mode.kind() != ModeKind::Menu
+            && self.mode.kind() != ModeKind::Delete
+        {
+            self.mode = Box::new(DeleteMode::new());
             return Some(ScreenCommand::Stay);
         }
 
