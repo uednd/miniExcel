@@ -53,5 +53,3 @@ static COL_NAMES: LazyLock<Vec<String>> = LazyLock::new(|| {
 pub fn col_name(index: usize) -> &'static str {
     COL_NAMES.get(index).map(|s| s.as_str()).unwrap_or("?")
 }
-
-

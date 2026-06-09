@@ -4,14 +4,19 @@ use std::fs;
 use std::io;
 use std::path::Path;
 
-use super::cell::{Cell, CellValue, Coord};
+use super::cell::{Cell, CellAddress, CellValue};
 
 /// 清空区域的规格。
 #[derive(Debug, Clone)]
 pub enum ClearSpec {
     Row(usize),
     Column(usize),
-    Rect { c1: usize, r1: usize, c2: usize, r2: usize },
+    Rect {
+        c1: usize,
+        r1: usize,
+        c2: usize,
+        r2: usize,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -20,7 +25,7 @@ pub struct Workbook {
     pub name: String,
     pub columns: usize,
     pub rows: usize,
-    pub cells: HashMap<Coord, Cell>,
+    pub cells: HashMap<CellAddress, Cell>,
 }
 
 impl Workbook {
@@ -44,12 +49,12 @@ impl Workbook {
         Ok(serde_json::from_str(&raw)?)
     }
 
-    pub fn get_cell(&self, coord: Coord) -> Option<&Cell> {
-        self.cells.get(&coord)
+    pub fn get_cell(&self, addr: CellAddress) -> Option<&Cell> {
+        self.cells.get(&addr)
     }
 
-    pub fn set_cell(&mut self, coord: Coord, raw: String, value: CellValue) {
-        self.cells.insert(coord, Cell { raw, value });
+    pub fn set_cell(&mut self, addr: CellAddress, raw: String, value: CellValue) {
+        self.cells.insert(addr, Cell { raw, value });
     }
 
     /// 删除指定行，该行上方的行不动，下方行上移，总行数减一。
@@ -58,12 +63,18 @@ impl Workbook {
         if self.rows <= 1 {
             return;
         }
-        let mut new_cells: HashMap<Coord, Cell> = HashMap::new();
-        for ((col, row), cell) in self.cells.drain() {
-            if row < r {
-                new_cells.insert((col, row), cell);
-            } else if row > r {
-                new_cells.insert((col, row - 1), cell);
+        let mut new_cells: HashMap<CellAddress, Cell> = HashMap::new();
+        for (addr, cell) in self.cells.drain() {
+            if addr.row < r {
+                new_cells.insert(addr, cell);
+            } else if addr.row > r {
+                new_cells.insert(
+                    CellAddress {
+                        row: addr.row - 1,
+                        col: addr.col,
+                    },
+                    cell,
+                );
             }
         }
         self.cells = new_cells;
@@ -76,12 +87,18 @@ impl Workbook {
         if self.columns <= 1 {
             return;
         }
-        let mut new_cells: HashMap<Coord, Cell> = HashMap::new();
-        for ((col, row), cell) in self.cells.drain() {
-            if col < c {
-                new_cells.insert((col, row), cell);
-            } else if col > c {
-                new_cells.insert((col - 1, row), cell);
+        let mut new_cells: HashMap<CellAddress, Cell> = HashMap::new();
+        for (addr, cell) in self.cells.drain() {
+            if addr.col < c {
+                new_cells.insert(addr, cell);
+            } else if addr.col > c {
+                new_cells.insert(
+                    CellAddress {
+                        row: addr.row,
+                        col: addr.col - 1,
+                    },
+                    cell,
+                );
             }
         }
         self.cells = new_cells;
@@ -92,14 +109,14 @@ impl Workbook {
     pub fn clear_region(&mut self, spec: ClearSpec) {
         match spec {
             ClearSpec::Row(r) => {
-                self.cells.retain(|&(_, row), _| row != r);
+                self.cells.retain(|addr, _| addr.row != r);
             }
             ClearSpec::Column(c) => {
-                self.cells.retain(|&(col, _), _| col != c);
+                self.cells.retain(|addr, _| addr.col != c);
             }
             ClearSpec::Rect { c1, r1, c2, r2 } => {
-                self.cells.retain(|&(col, row), _| {
-                    col < c1 || col > c2 || row < r1 || row > r2
+                self.cells.retain(|addr, _| {
+                    addr.col < c1 || addr.col > c2 || addr.row < r1 || addr.row > r2
                 });
             }
         }
