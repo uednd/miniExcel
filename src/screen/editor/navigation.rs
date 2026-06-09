@@ -33,7 +33,7 @@ impl Mode for NavigationMode {
                 Self::apply_direction(ctx, nav);
                 ctx.selection = Some(Selection::Range {
                     anchor,
-                    cursor: (ctx.cursor_col, ctx.cursor_row),
+                    cursor: ctx.cursor,
                 });
                 return ModeAction::Nothing;
             }
@@ -51,10 +51,10 @@ impl Mode for NavigationMode {
                         Selection::Column(c) => ClearSpec::Column(c),
                         Selection::Range { anchor, cursor } => {
                             ClearSpec::Rect {
-                                c1: anchor.0.min(cursor.0),
-                                r1: anchor.1.min(cursor.1),
-                                c2: anchor.0.max(cursor.0),
-                                r2: anchor.1.max(cursor.1),
+                                c1: anchor.col.min(cursor.col),
+                                r1: anchor.row.min(cursor.row),
+                                c2: anchor.col.max(cursor.col),
+                                r2: anchor.row.max(cursor.row),
                             }
                         }
                     };
@@ -92,11 +92,11 @@ impl Mode for NavigationMode {
 
         // --- 非选中模式：Shift+方向键创建 Range 选区 ---
         if let Some(nav) = Self::parse_shift_direction(key) {
-            let anchor = (ctx.cursor_col, ctx.cursor_row);
+            let anchor = ctx.cursor;
             Self::apply_direction(ctx, nav);
             ctx.selection = Some(Selection::Range {
                 anchor,
-                cursor: (ctx.cursor_col, ctx.cursor_row),
+                cursor: ctx.cursor,
             });
             return ModeAction::Nothing;
         }
@@ -114,7 +114,7 @@ impl Mode for NavigationMode {
                     .modifiers
                     .contains(KeyModifiers::CONTROL | KeyModifiers::SHIFT) =>
             {
-                ctx.selection = Some(Selection::Row(ctx.cursor_row));
+                ctx.selection = Some(Selection::Row(ctx.cursor.row));
                 return ModeAction::Nothing;
             }
             KeyCode::Up | KeyCode::Down
@@ -122,7 +122,7 @@ impl Mode for NavigationMode {
                     .modifiers
                     .contains(KeyModifiers::CONTROL | KeyModifiers::SHIFT) =>
             {
-                ctx.selection = Some(Selection::Column(ctx.cursor_col));
+                ctx.selection = Some(Selection::Column(ctx.cursor.col));
                 return ModeAction::Nothing;
             }
             _ => {}
@@ -136,7 +136,7 @@ impl Mode for NavigationMode {
             },
             KeyCode::Backspace | KeyCode::Delete => {
                 ctx.wb.set_cell(
-                    (ctx.cursor_col, ctx.cursor_row),
+                    ctx.cursor,
                     String::new(),
                     crate::model::cell::CellValue::Empty,
                 );
@@ -169,7 +169,7 @@ impl Mode for NavigationMode {
         Some(Line::from(vec![
             Span::styled("[", Style::default().fg(ctx.theme.text_dim)),
             Span::styled(
-                crate::model::cell::display_coord(ctx.cursor_row, ctx.cursor_col),
+                ctx.cursor.display(),
                 Style::default().fg(ctx.theme.accent),
             ),
             Span::styled(", 导航模式", Style::default().fg(ctx.theme.text_dim)),
@@ -210,10 +210,10 @@ impl NavigationMode {
 
     fn apply_direction(ctx: &mut TableContext, nav: NavigationKey) {
         match nav {
-            NavigationKey::Up if ctx.cursor_row > 0 => ctx.cursor_row -= 1,
-            NavigationKey::Down if ctx.cursor_row + 1 < ctx.wb.rows => ctx.cursor_row += 1,
-            NavigationKey::Left if ctx.cursor_col > 0 => ctx.cursor_col -= 1,
-            NavigationKey::Right if ctx.cursor_col + 1 < ctx.wb.columns => ctx.cursor_col += 1,
+            NavigationKey::Up if ctx.cursor.row > 0 => ctx.cursor.row -= 1,
+            NavigationKey::Down if ctx.cursor.row + 1 < ctx.wb.rows => ctx.cursor.row += 1,
+            NavigationKey::Left if ctx.cursor.col > 0 => ctx.cursor.col -= 1,
+            NavigationKey::Right if ctx.cursor.col + 1 < ctx.wb.columns => ctx.cursor.col += 1,
             _ => {}
         }
         ctx.scroll_into_view();
