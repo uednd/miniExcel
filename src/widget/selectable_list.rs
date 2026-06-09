@@ -11,13 +11,17 @@ use crate::{
     theme::Theme,
 };
 
-/// 可选项
+/// 编辑器命令列表中的一项。
+///
+/// `action` 直接接收 `TableContext`，因此该类型目前服务于编辑器模式，
+/// 不是独立于编辑器的通用列表项。
 pub struct SelectableItem {
     pub label: String,
     pub action: Box<dyn Fn(&mut TableContext) -> ModeAction>,
 }
 
 impl SelectableItem {
+    /// 创建一个带标签和执行动作的列表项。
     pub fn new(
         label: impl Into<String>,
         action: impl Fn(&mut TableContext) -> ModeAction + 'static,
@@ -29,7 +33,9 @@ impl SelectableItem {
     }
 }
 
-/// 通用选择列表面板
+/// 编辑器命令选择列表。
+///
+/// 该列表负责选中项状态和渲染，按下 Enter 时执行当前项的动作。
 pub struct SelectableList {
     items: Vec<SelectableItem>,
     selected: usize,
@@ -37,6 +43,8 @@ pub struct SelectableList {
 
 impl SelectableList {
     /// 创建一个选择列表，默认选中第 0 项。
+    ///
+    /// 调用者应传入至少一个列表项。
     pub fn new(items: Vec<SelectableItem>) -> Self {
         Self { items, selected: 0 }
     }
@@ -55,7 +63,9 @@ impl SelectableList {
         }
     }
 
-    /// 执行当前选中项的 action 闭包，返回 ModeAction。
+    /// 执行当前选中项的动作。
+    ///
+    /// 如果列表为空，返回 `None`。
     pub fn handle_enter(&self, ctx: &mut TableContext) -> Option<ModeAction> {
         self.items.get(self.selected).map(|item| (item.action)(ctx))
     }

@@ -6,7 +6,10 @@ use std::path::Path;
 
 use super::cell::{Cell, CellAddress, CellValue};
 
-/// 清空区域的规格。
+/// 清空单元格内容的范围。
+///
+/// 行列索引均从 0 开始。`Rect` 的四个端点必须已经归一化：
+/// `c1 <= c2` 且 `r1 <= r2`。
 #[derive(Debug, Clone)]
 pub enum ClearSpec {
     Row(usize),
@@ -19,6 +22,10 @@ pub enum ClearSpec {
     },
 }
 
+/// 工作簿数据模型。
+///
+/// `columns` 和 `rows` 表示当前表格尺寸，`cells` 只保存有内容的单元格。
+/// 调用者应保证传入的 `CellAddress` 位于当前尺寸内。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Workbook {
     pub version: u8,
@@ -29,6 +36,9 @@ pub struct Workbook {
 }
 
 impl Workbook {
+    /// 创建空工作簿。
+    ///
+    /// `columns` 和 `rows` 应至少为 1。
     pub fn new(name: String, columns: usize, rows: usize) -> Self {
         Self {
             version: 1,
@@ -39,26 +49,40 @@ impl Workbook {
         }
     }
 
+    /// 将工作簿以 JSON 写入指定路径。
+    ///
+    /// 序列化失败或文件写入失败时返回 `io::Error`。
     pub fn save<P: AsRef<Path>>(&self, path: P) -> io::Result<()> {
         let json = serde_json::to_string_pretty(self)?;
         fs::write(path, json)
     }
 
+    /// 从指定路径读取工作簿。
+    ///
+    /// 文件读取失败或 JSON 解析失败时返回 `io::Error`。
     pub fn load<P: AsRef<Path>>(path: P) -> io::Result<Self> {
         let raw = fs::read_to_string(path)?;
         Ok(serde_json::from_str(&raw)?)
     }
 
+    /// 读取指定地址的单元格。
+    ///
+    /// 空白单元格不会出现在 `cells` 中，因此返回 `None`。
     pub fn get_cell(&self, addr: CellAddress) -> Option<&Cell> {
         self.cells.get(&addr)
     }
 
+    /// 写入指定地址的单元格。
+    ///
+    /// 该方法不检查地址是否越界，调用者负责传入合法地址。
     pub fn set_cell(&mut self, addr: CellAddress, raw: String, value: CellValue) {
         self.cells.insert(addr, Cell { raw, value });
     }
 
     /// 删除指定行，该行上方的行不动，下方行上移，总行数减一。
-    /// 至少保留一行，调用方负责裁剪光标位置。
+    ///
+    /// 至少保留一行。该方法只维护工作簿尺寸和单元格位置；
+    /// 光标、滚动和选区由编辑器状态负责同步。
     pub fn delete_row(&mut self, r: usize) {
         if self.rows <= 1 {
             return;
@@ -82,7 +106,9 @@ impl Workbook {
     }
 
     /// 删除指定列，该列左侧的列不动，右侧列左移，总列数减一。
-    /// 至少保留一列，调用方负责裁剪光标位置。
+    ///
+    /// 至少保留一列。该方法只维护工作簿尺寸和单元格位置；
+    /// 光标、滚动和选区由编辑器状态负责同步。
     pub fn delete_column(&mut self, c: usize) {
         if self.columns <= 1 {
             return;

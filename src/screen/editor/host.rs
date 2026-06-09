@@ -11,21 +11,28 @@ use super::{
     navigation::NavigationMode,
 };
 
-/// 模式生命周期协调器：快捷键拦截、模式切换、委托渲染。
+/// 编辑器模式宿主。
+///
+/// 宿主先处理跨模式快捷键，再把按键交给当前模式。
+/// 当前模式返回 `Handled` 时，宿主会向外层返回 `ScreenCommand::Stay`，
+/// 让应用主循环知道该事件已经被消费。
 pub struct ModeHost {
     mode: Box<dyn Mode>,
 }
 
 impl ModeHost {
+    /// 使用初始模式创建宿主。
     pub fn new(mode: Box<dyn Mode>) -> Self {
         Self { mode }
     }
 
+    /// 返回当前模式种类。
     #[allow(dead_code)]
     pub fn mode_kind(&self) -> ModeKind {
         self.mode.kind()
     }
 
+    /// 处理按键并转换为屏幕命令。
     pub fn handle_key(&mut self, ctx: &mut TableContext, key: KeyEvent) -> Option<ScreenCommand> {
         if let Some(cmd) = self.intercept_shortcut(ctx, key) {
             return Some(cmd);
@@ -40,14 +47,17 @@ impl ModeHost {
         }
     }
 
+    /// 渲染当前模式专属区域，并返回剩余表格区域。
     pub fn render(&self, frame: &mut Frame, area: Rect, ctx: &TableContext) -> Rect {
         self.mode.render(frame, area, ctx)
     }
 
+    /// 返回当前编辑缓冲；只有编辑模式会返回 `Some`。
     pub fn edit_buffer(&self) -> Option<&str> {
         self.mode.edit_buffer()
     }
 
+    /// 返回当前模式页脚。
     pub fn footer(&self, ctx: &TableContext) -> FooterLine {
         self.mode.footer(ctx)
     }

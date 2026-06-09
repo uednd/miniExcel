@@ -6,13 +6,19 @@ use crate::model::cell::CellAddress;
 
 /// 模式处理按键后的结果。
 pub enum ModeAction {
+    /// 按键已被当前模式处理，宿主应保持在当前屏幕。
     Handled,
+    /// 当前模式不处理该按键，宿主可以继续交给外层逻辑。
     #[allow(dead_code)]
     Unhandled,
+    /// 切换到另一个编辑器模式。
     SwitchMode(Box<dyn Mode>),
 }
 
-/// 选区类型：行选中 / 列选中 / 矩形区域（预留 Shift+方向键）。
+/// 表格选区。
+///
+/// 行、列索引均从 0 开始。矩形选区保存锚点和当前光标，
+/// 使用方负责在需要时归一化端点顺序。
 pub enum Selection {
     Row(usize),
     Column(usize),
@@ -22,6 +28,7 @@ pub enum Selection {
     },
 }
 
+/// 编辑器模式种类。
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum ModeKind {
     Navigation,
@@ -30,7 +37,7 @@ pub enum ModeKind {
     Delete,
 }
 
-/// 页脚信息
+/// 当前模式想显示在页脚中的提示和状态文本。
 pub struct FooterLine {
     pub hint: Option<Line<'static>>,
     pub status: Option<Line<'static>>,
@@ -46,18 +53,24 @@ impl FooterLine {
 }
 
 pub trait Mode {
+    /// 返回当前模式种类，供宿主判断快捷键策略。
     fn kind(&self) -> ModeKind;
 
+    /// 处理一个按键事件。
     fn handle_key(&mut self, ctx: &mut TableContext, key: KeyEvent) -> ModeAction;
 
-    /// 渲染模式专属内容（侧面板、编辑栏等），返回留给表格区域的 Rect。
+    /// 渲染模式专属内容，并返回留给表格区域的区域。
+    ///
+    /// 例如菜单模式会占用右侧面板，编辑模式会占用底部输入行。
     fn render(&self, frame: &mut Frame, area: Rect, ctx: &TableContext) -> Rect;
 
+    /// 返回当前模式的页脚文本。
     fn footer(&self, ctx: &TableContext) -> FooterLine {
         let _ = ctx;
         FooterLine::none()
     }
 
+    /// 返回正在编辑的文本；非编辑模式返回 `None`。
     fn edit_buffer(&self) -> Option<&str> {
         None
     }

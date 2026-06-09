@@ -1,6 +1,9 @@
 use crate::model::cell::CellAddress;
 
-/// 表格视口状态：光标位置、滚动偏移、可见行/列数。
+/// 表格视口状态：光标位置、滚动偏移、可见行列数。
+///
+/// 光标只能通过移动和裁剪方法修改，避免调用者绕过滚动同步。
+/// 可见行列数由渲染阶段根据终端区域更新。
 pub struct Viewport {
     cursor: CellAddress,
     scroll_row: usize,
@@ -10,6 +13,7 @@ pub struct Viewport {
 }
 
 impl Viewport {
+    /// 创建位于左上角、尚未测量可见范围的视口。
     pub fn new() -> Self {
         Self {
             cursor: CellAddress::new(0, 0),
@@ -20,44 +24,48 @@ impl Viewport {
         }
     }
 
-    // ── visible 读写 ──
-
+    /// 当前光标地址。
     pub fn cursor(&self) -> CellAddress {
         self.cursor
     }
 
+    /// 当前光标所在行。
     pub fn cursor_row(&self) -> usize {
         self.cursor.row
     }
 
+    /// 当前光标所在列。
     pub fn cursor_col(&self) -> usize {
         self.cursor.col
     }
 
+    /// 当前垂直滚动偏移。
     pub fn scroll_row(&self) -> usize {
         self.scroll_row
     }
 
+    /// 当前水平滚动偏移。
     pub fn scroll_col(&self) -> usize {
         self.scroll_col
     }
 
+    /// 当前可见行数。
     pub fn visible_rows(&self) -> usize {
         self.visible_rows
     }
 
+    /// 当前可见列数。
     pub fn visible_cols(&self) -> usize {
         self.visible_cols
     }
 
-    /// 渲染阶段调用：由外部根据终端区域计算后写入。
+    /// 更新渲染阶段测量出的可见行列数。
     pub fn update_visible(&mut self, rows: usize, cols: usize) {
         self.visible_rows = rows;
         self.visible_cols = cols;
     }
 
-    // ── 光标移动（自动聚焦） ──
-
+    /// 向上移动光标，并保持光标可见。
     pub fn move_up(&mut self) {
         if self.cursor.row > 0 {
             self.cursor.row -= 1;
@@ -65,6 +73,7 @@ impl Viewport {
         }
     }
 
+    /// 向下移动光标，并保持光标可见。
     pub fn move_down(&mut self, row_count: usize) {
         if self.cursor.row + 1 < row_count {
             self.cursor.row += 1;
@@ -72,6 +81,7 @@ impl Viewport {
         }
     }
 
+    /// 向左移动光标，并保持光标可见。
     pub fn move_left(&mut self) {
         if self.cursor.col > 0 {
             self.cursor.col -= 1;
@@ -79,6 +89,7 @@ impl Viewport {
         }
     }
 
+    /// 向右移动光标，并保持光标可见。
     pub fn move_right(&mut self, col_count: usize) {
         if self.cursor.col + 1 < col_count {
             self.cursor.col += 1;
@@ -86,21 +97,23 @@ impl Viewport {
         }
     }
 
-    // ── 滚动 ──
-
+    /// 向上滚动指定行数。
     pub fn scroll_up(&mut self, amount: usize) {
         self.scroll_row = self.scroll_row.saturating_sub(amount);
     }
 
+    /// 向下滚动指定行数，不超过工作簿底部。
     pub fn scroll_down(&mut self, amount: usize, row_count: usize) {
         let max = row_count.saturating_sub(self.visible_rows());
         self.scroll_row = (self.scroll_row + amount).min(max);
     }
 
+    /// 向左滚动指定列数。
     pub fn scroll_left(&mut self, amount: usize) {
         self.scroll_col = self.scroll_col.saturating_sub(amount);
     }
 
+    /// 向右滚动指定列数，不超过工作簿右边界。
     pub fn scroll_right(&mut self, amount: usize, col_count: usize) {
         let max = col_count.saturating_sub(self.visible_cols());
         self.scroll_col = (self.scroll_col + amount).min(max);
@@ -124,14 +137,14 @@ impl Viewport {
         }
     }
 
-    // ── 光标裁剪 ──
-
+    /// 在删除行后裁剪光标行。
     pub fn clamp_cursor_row(&mut self, row_count: usize) {
         if self.cursor.row >= row_count {
             self.cursor.row = row_count.saturating_sub(1);
         }
     }
 
+    /// 在删除列后裁剪光标列。
     pub fn clamp_cursor_col(&mut self, col_count: usize) {
         if self.cursor.col >= col_count {
             self.cursor.col = col_count.saturating_sub(1);

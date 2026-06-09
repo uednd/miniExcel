@@ -23,6 +23,9 @@ pub const ROW_NUM_WIDTH: u16 = 4;
 
 pub struct TableGrid;
 
+/// 表格渲染输入。
+///
+/// 调用 `render` 前应先根据目标区域更新 `viewport` 的可见行列数。
 pub struct TableGridConfig<'a> {
     pub wb: &'a Workbook,
     pub viewport: &'a Viewport,
@@ -32,6 +35,7 @@ pub struct TableGridConfig<'a> {
 }
 
 impl TableGrid {
+    /// 渲染表格网格、表头、单元格内容、光标和选区。
     pub fn render(frame: &mut Frame, area: Rect, cfg: TableGridConfig) {
         let vp = cfg.viewport;
         let cursor = vp.cursor();
