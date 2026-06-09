@@ -10,6 +10,7 @@ use ratatui::{Frame, layout::Rect, style::Style, widgets::Block};
 
 use crate::{
     model::{
+        cell::CellAddress,
         limits::{MAX_COLUMNS, MAX_ROWS},
         workbook::Workbook,
     },
@@ -50,8 +51,7 @@ impl TableScreen {
             theme,
             path,
             wb,
-            cursor_row: 0,
-            cursor_col: 0,
+            cursor: CellAddress::new(0, 0),
             scroll_row: 0,
             scroll_col: 0,
             visible_rows: std::cell::Cell::new(0),
@@ -87,8 +87,7 @@ impl Screen for TableScreen {
                 wb: &self.ctx.wb,
                 scroll_col: self.ctx.scroll_col,
                 scroll_row: self.ctx.scroll_row,
-                cursor_row: self.ctx.cursor_row,
-                cursor_col: self.ctx.cursor_col,
+                cursor: self.ctx.cursor,
                 theme: self.ctx.theme,
                 edit_buffer,
                 selection,
@@ -134,7 +133,7 @@ impl Screen for TableScreen {
                 let existing = self
                     .ctx
                     .wb
-                    .get_cell((self.ctx.cursor_col, self.ctx.cursor_row))
+                    .get_cell(self.ctx.cursor)
                     .map(|c| c.raw.clone())
                     .unwrap_or_default();
                 self.mode = Box::new(EditMode::new(existing, initial_char));

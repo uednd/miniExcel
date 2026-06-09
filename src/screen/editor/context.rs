@@ -1,6 +1,6 @@
 use std::cell::Cell;
 
-use crate::{model::workbook::Workbook, theme::Theme};
+use crate::{model::{cell::CellAddress, workbook::Workbook}, theme::Theme};
 
 use super::mode::Selection;
 
@@ -9,8 +9,7 @@ pub struct TableContext {
     pub theme: Theme,
     pub path: String,
     pub wb: Workbook,
-    pub cursor_row: usize,
-    pub cursor_col: usize,
+    pub cursor: CellAddress,
     pub scroll_row: usize,
     pub scroll_col: usize,
     pub visible_rows: Cell<usize>,
@@ -27,17 +26,17 @@ impl TableContext {
     pub fn scroll_into_view(&mut self) {
         let visible_rows = self.visible_rows.get();
         let visible_cols = self.visible_cols.get();
-        if self.cursor_row < self.scroll_row {
-            self.scroll_row = self.cursor_row;
+        if self.cursor.row < self.scroll_row {
+            self.scroll_row = self.cursor.row;
         }
-        if self.cursor_row >= self.scroll_row + visible_rows {
-            self.scroll_row = self.cursor_row.saturating_sub(visible_rows - 1);
+        if self.cursor.row >= self.scroll_row + visible_rows {
+            self.scroll_row = self.cursor.row.saturating_sub(visible_rows - 1);
         }
-        if self.cursor_col < self.scroll_col {
-            self.scroll_col = self.cursor_col;
+        if self.cursor.col < self.scroll_col {
+            self.scroll_col = self.cursor.col;
         }
-        if self.cursor_col >= self.scroll_col + visible_cols {
-            self.scroll_col = self.cursor_col.saturating_sub(visible_cols - 1);
+        if self.cursor.col >= self.scroll_col + visible_cols {
+            self.scroll_col = self.cursor.col.saturating_sub(visible_cols - 1);
         }
     }
 }
