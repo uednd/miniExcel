@@ -253,7 +253,7 @@ fn format_number(n: f64) -> String {
         return "0".to_string();
     }
     let abs = n.abs();
-    if abs < 1e-6 || abs >= 1e12 {
+    if !(1e-6..1e12).contains(&abs) {
         return format!("{:.2e}", n);
     }
     let s = format!("{:.10}", n);

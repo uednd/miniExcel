@@ -46,8 +46,7 @@ impl<'a> Evaluator<'a> {
             None => return Ok(CellValue::Empty),
         };
 
-        if raw.starts_with('=') {
-            let formula = &raw[1..];
+        if let Some(formula) = raw.strip_prefix('=') {
             self.evaluating.insert(addr);
             let ast = parser::parse(formula.trim()).map_err(|_| CellError::Value)?;
             let result = self.eval_expr(&ast, addr);

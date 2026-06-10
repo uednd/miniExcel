@@ -26,24 +26,25 @@ impl CellReader for WorkbookReader<'_> {
 }
 
 pub fn recalc(wb: &mut Workbook) {
-    let reader = WorkbookReader { cells: &wb.cells };
-    let mut evaluator = Evaluator::new(&reader);
+    let updates = {
+        let reader = WorkbookReader { cells: &wb.cells };
+        let mut evaluator = Evaluator::new(&reader);
 
-    let addrs: Vec<CellAddress> = wb.cells.keys().copied().collect();
-    let mut updates: Vec<(CellAddress, CellValue)> = Vec::new();
+        let addrs: Vec<CellAddress> = wb.cells.keys().copied().collect();
+        let mut updates: Vec<(CellAddress, CellValue)> = Vec::new();
 
-    for addr in addrs {
-        if let Some(cell) = wb.cells.get(&addr) {
-            if cell.raw.starts_with('=') {
+        for addr in addrs {
+            if let Some(cell) = wb.cells.get(&addr)
+                && cell.raw.starts_with('=')
+            {
                 let result = evaluator.eval_cell(addr);
-                let new_val = result.unwrap_or_else(|e| CellValue::Error(e));
+                let new_val = result.unwrap_or_else(CellValue::Error);
                 updates.push((addr, new_val));
             }
         }
-    }
 
-    drop(evaluator);
-    drop(reader);
+        updates
+    };
 
     for (addr, value) in updates {
         if let Some(cell) = wb.cells.get_mut(&addr) {
