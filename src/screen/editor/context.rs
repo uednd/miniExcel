@@ -6,6 +6,7 @@ use crate::{
     screen::ScreenCommand,
     theme::Theme,
 };
+use std::path::PathBuf;
 
 use super::{mode::Selection, viewport::Viewport};
 
@@ -16,7 +17,7 @@ use super::{mode::Selection, viewport::Viewport};
 pub struct TableContext {
     pub theme: Theme,
     pub viewport: Viewport,
-    path: String,
+    path: PathBuf,
     wb: Workbook,
     selection: Option<Selection>,
     copied_region: Option<Selection>,
@@ -35,7 +36,7 @@ pub struct SelectionStats {
 
 impl TableContext {
     /// 创建编辑器共享状态。
-    pub fn new(theme: Theme, path: String, wb: Workbook) -> Self {
+    pub fn new(theme: Theme, path: PathBuf, wb: Workbook) -> Self {
         Self {
             theme,
             path,

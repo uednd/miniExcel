@@ -12,7 +12,8 @@ mod widget;
 
 fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
-    let mut app = app::App::new();
+    let initial_file = std::env::args().nth(1);
+    let mut app = app::App::new(initial_file);
     ratatui::run(|terminal| {
         crossterm::execute!(std::io::stdout(), crossterm::event::EnableMouseCapture)?;
         let result = app.run(terminal);

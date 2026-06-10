@@ -1,4 +1,7 @@
-use std::time::{Duration, Instant};
+use std::{
+    path::PathBuf,
+    time::{Duration, Instant},
+};
 
 use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers, MouseEventKind};
 use ratatui::{
@@ -10,6 +13,7 @@ use ratatui::{
 
 use crate::{
     exit::ExitHandler,
+    model::{recent::RecentFiles, table_path::resolve_table_path},
     screen::{EventResult, FrameState, Screen, ScreenCommand, home::MenuScreen},
     theme::Theme,
     widget::footer::Footer,
@@ -44,7 +48,8 @@ impl BlinkState {
 
 pub struct App {
     theme: Theme,
-    cwd: String,
+    cwd: PathBuf,
+    recent: RecentFiles,
     active_screen: Box<dyn Screen>,
     exit_handler: ExitHandler,
     blink: BlinkState,
@@ -52,17 +57,24 @@ pub struct App {
 }
 
 impl App {
-    pub fn new() -> Self {
-        let full_cwd = std::env::current_dir()
-            .map(|p| p.display().to_string())
-            .unwrap_or_else(|_| String::from("."));
-        let display_cwd = replace_homedir::replace_homedir(&full_cwd, "~");
+    pub fn new(initial_file: Option<String>) -> Self {
+        let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+        let display_cwd = replace_homedir::replace_homedir(&cwd.display().to_string(), "~");
         let theme = Theme::dark();
+        let mut recent = RecentFiles::load();
+        let active_screen: Box<dyn Screen> = if let Some(file) = initial_file {
+            let path = resolve_table_path(&file, &cwd);
+            recent.add(&path);
+            Box::new(crate::screen::editor::TableScreen::new(theme, path))
+        } else {
+            Box::new(MenuScreen::new(theme, cwd.clone(), recent.items().to_vec()))
+        };
 
         Self {
             theme,
-            cwd: full_cwd.clone(),
-            active_screen: Box::new(MenuScreen::new(theme, full_cwd)),
+            cwd,
+            recent,
+            active_screen,
             exit_handler: ExitHandler::new(Duration::from_secs(1)),
             blink: BlinkState::new(),
             footer: Footer::new(display_cwd, APP_VERSION.to_string(), theme),
@@ -151,11 +163,24 @@ impl App {
     fn process_cmd(&mut self, cmd: ScreenCommand) {
         match cmd {
             ScreenCommand::OpenEditor { path } => {
+                self.recent.add(&path);
                 self.active_screen =
                     Box::new(super::screen::editor::TableScreen::new(self.theme, path));
             }
+            ScreenCommand::RemoveRecent { path } => {
+                self.recent.remove(&path);
+                self.active_screen = Box::new(MenuScreen::new(
+                    self.theme,
+                    self.cwd.clone(),
+                    self.recent.items().to_vec(),
+                ));
+            }
             ScreenCommand::GoHome => {
-                self.active_screen = Box::new(MenuScreen::new(self.theme, self.cwd.clone()));
+                self.active_screen = Box::new(MenuScreen::new(
+                    self.theme,
+                    self.cwd.clone(),
+                    self.recent.items().to_vec(),
+                ));
             }
         }
     }

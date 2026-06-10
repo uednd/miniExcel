@@ -3,21 +3,31 @@ use ratatui::{
     Frame,
     layout::{Constraint, Layout, Rect},
     style::{Modifier, Style, Stylize},
-    text::Line,
+    text::{Line, Span},
     widgets::{Block, Paragraph},
 };
+use std::path::PathBuf;
 
 use crate::screen::EventResult;
-use crate::{theme::Theme, widget::input::Input};
+use crate::{
+    model::recent::RecentFile,
+    theme::Theme,
+    widget::{
+        input::Input,
+        recent_list::{RecentList, RecentListCommand},
+    },
+};
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum TabCommand {
-    CreateTable(String),
+    OpenTable(String),
+    OpenRecent(PathBuf),
+    RemoveRecent(PathBuf),
 }
 
 pub enum TabPage {
-    Recent(&'static str),
-    NewTable(&'static str, Input),
+    Recent(&'static str, RecentList),
+    OpenTable(&'static str, Input),
     Settings(&'static str),
 }
 
@@ -28,13 +38,13 @@ pub struct Tabs {
 }
 
 impl Tabs {
-    pub fn new(theme: Theme) -> Self {
+    pub fn new(theme: Theme, recent_files: Vec<RecentFile>) -> Self {
         Self {
             selected: 0,
             theme,
             pages: [
-                TabPage::Recent("最近打开"),
-                TabPage::NewTable("新建表格", Input::new(theme)),
+                TabPage::Recent("最近打开", RecentList::new(recent_files)),
+                TabPage::OpenTable("打开表格", Input::new(theme)),
                 TabPage::Settings("设置"),
             ],
         }
@@ -79,6 +89,27 @@ impl Tabs {
         }
     }
 
+    pub fn footer_hint(&self) -> Line<'static> {
+        match &self.pages[self.selected] {
+            TabPage::Recent(_, recent) if recent.is_empty() => {
+                hint_line(self.theme, &[("Tab", "切换标签")])
+            }
+            TabPage::Recent(_, _) => hint_line(
+                self.theme,
+                &[
+                    ("Enter", "打开"),
+                    ("Delete", "移除"),
+                    ("↑ / ↓", "选择"),
+                    ("Tab", "切换标签"),
+                ],
+            ),
+            TabPage::OpenTable(_, _) => {
+                hint_line(self.theme, &[("Enter", "打开或创建"), ("Tab", "切换标签")])
+            }
+            TabPage::Settings(_) => hint_line(self.theme, &[("Tab", "切换标签")]),
+        }
+    }
+
     fn render_tab_bar(&self, frame: &mut Frame, area: Rect) {
         let chunks: [Rect; 3] = Layout::horizontal([Constraint::Fill(1); 3]).areas(area);
 
@@ -109,22 +140,17 @@ impl Tabs {
 impl TabPage {
     fn label(&self) -> &'static str {
         match self {
-            TabPage::Recent(l) | TabPage::NewTable(l, _) | TabPage::Settings(l) => l,
+            TabPage::Recent(l, _) | TabPage::OpenTable(l, _) | TabPage::Settings(l) => l,
         }
     }
 
     fn render(&self, frame: &mut Frame, area: Rect, theme: Theme) {
         match self {
-            TabPage::Recent(_) => {
-                frame.render_widget(
-                    Paragraph::new("暂无最近打开的文件")
-                        .centered()
-                        .fg(theme.text_dim),
-                    area,
-                );
+            TabPage::Recent(_, recent) => {
+                recent.render(frame, area, theme);
             }
 
-            TabPage::NewTable(_, input) => {
+            TabPage::OpenTable(_, input) => {
                 let [_, input_area, _, hint_area, _] = Layout::vertical([
                     Constraint::Fill(1),
                     Constraint::Length(3),
@@ -144,7 +170,7 @@ impl TabPage {
                 input.render(frame, input_centered[1]);
 
                 frame.render_widget(
-                    Paragraph::new("输入后按 Enter 创建表格")
+                    Paragraph::new("输入后按 Enter 打开或创建表格")
                         .centered()
                         .fg(theme.text_dim),
                     hint_area,
@@ -164,10 +190,20 @@ impl TabPage {
 
     fn handle_key(&mut self, key: KeyEvent) -> EventResult<TabCommand> {
         match self {
-            TabPage::NewTable(_, input) => match key.code {
+            TabPage::Recent(_, recent) => match recent.handle_key(key) {
+                EventResult::Command(RecentListCommand::Open(path)) => {
+                    EventResult::Command(TabCommand::OpenRecent(path))
+                }
+                EventResult::Command(RecentListCommand::Remove(path)) => {
+                    EventResult::Command(TabCommand::RemoveRecent(path))
+                }
+                EventResult::Handled => EventResult::Handled,
+                EventResult::Ignored => EventResult::Ignored,
+            },
+            TabPage::OpenTable(_, input) => match key.code {
                 KeyCode::Enter => {
                     let name = table_name(input);
-                    EventResult::Command(TabCommand::CreateTable(name))
+                    EventResult::Command(TabCommand::OpenTable(name))
                 }
                 KeyCode::Backspace => {
                     input.delete_char();
@@ -195,4 +231,24 @@ fn table_name(input: &Input) -> String {
     } else {
         name.to_string()
     }
+}
+
+fn hint_line(theme: Theme, pairs: &[(&'static str, &'static str)]) -> Line<'static> {
+    let mut spans = vec![
+        Span::styled("● 提示", Style::default().fg(theme.accent)),
+        Span::styled(" ", Style::default().fg(theme.text_dim)),
+    ];
+
+    for (index, (key, label)) in pairs.iter().enumerate() {
+        if index > 0 {
+            spans.push(Span::styled("  ", Style::default().fg(theme.text_dim)));
+        }
+        spans.push(Span::styled(*key, Style::default().fg(theme.text)));
+        spans.push(Span::styled(
+            format!(" {}", label),
+            Style::default().fg(theme.text_dim),
+        ));
+    }
+
+    Line::from(spans)
 }

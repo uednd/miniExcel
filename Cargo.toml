@@ -9,6 +9,7 @@ edition = "2024"
 [dependencies]
 color-eyre = "0.6.3"
 crossterm = "0.29.0"
+dirs-next = "2"
 ratatui = "0.30.1"
 arboard = "3"
 replace-homedir = "0.1"

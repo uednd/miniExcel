@@ -9,6 +9,7 @@ mod viewport;
 
 use crossterm::event::{KeyEvent, MouseEvent, MouseEventKind};
 use ratatui::{Frame, layout::Rect, style::Style, widgets::Block};
+use std::path::PathBuf;
 
 use crate::{
     model::{
@@ -34,9 +35,9 @@ pub struct TableScreen {
 }
 
 impl TableScreen {
-    pub fn new(theme: Theme, path: String) -> Self {
+    pub fn new(theme: Theme, path: PathBuf) -> Self {
         let wb = Workbook::load(&path).unwrap_or_else(|_| {
-            let name = std::path::Path::new(&path)
+            let name = path
                 .file_stem()
                 .and_then(|s| s.to_str())
                 .unwrap_or("untitled")

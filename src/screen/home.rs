@@ -2,15 +2,12 @@ use crossterm::event::KeyEvent;
 use ratatui::{
     Frame,
     layout::{Constraint, Layout, Rect},
-    style::Style,
-    text::{Line, Span},
+    text::Line,
 };
+use std::path::PathBuf;
 
 use crate::{
-    model::{
-        limits::{MAX_COLUMNS, MAX_ROWS},
-        workbook::Workbook,
-    },
+    model::{recent::RecentFile, table_path::resolve_table_path},
     theme::Theme,
     widget::{
         logo::{LOGO_HEIGHT, Logo},
@@ -21,19 +18,17 @@ use crate::{
 use super::{EventResult, Screen, ScreenCommand};
 
 pub struct MenuScreen {
-    theme: Theme,
-    cwd: String,
+    cwd: PathBuf,
     logo: Logo,
     tabs: Tabs,
 }
 
 impl MenuScreen {
-    pub fn new(theme: Theme, cwd: String) -> Self {
+    pub fn new(theme: Theme, cwd: PathBuf, recent_files: Vec<RecentFile>) -> Self {
         Self {
-            theme,
             cwd,
             logo: Logo::new(theme),
-            tabs: Tabs::new(theme),
+            tabs: Tabs::new(theme, recent_files),
         }
     }
 }
@@ -56,25 +51,21 @@ impl Screen for MenuScreen {
     fn handle_key(&mut self, key: KeyEvent) -> EventResult<ScreenCommand> {
         match self.tabs.handle_key(key) {
             EventResult::Handled => EventResult::Handled,
-            EventResult::Command(TabCommand::CreateTable(name)) => {
-                let path = format!("{}/{}.mxlsx", self.cwd, name);
-                let wb = Workbook::new(name, MAX_COLUMNS, MAX_ROWS);
-                if wb.save(&path).is_ok() {
-                    EventResult::Command(ScreenCommand::OpenEditor { path })
-                } else {
-                    EventResult::Handled
-                }
+            EventResult::Command(TabCommand::OpenTable(input)) => {
+                let path = resolve_table_path(&input, &self.cwd);
+                EventResult::Command(ScreenCommand::OpenEditor { path })
+            }
+            EventResult::Command(TabCommand::OpenRecent(path)) => {
+                EventResult::Command(ScreenCommand::OpenEditor { path })
+            }
+            EventResult::Command(TabCommand::RemoveRecent(path)) => {
+                EventResult::Command(ScreenCommand::RemoveRecent { path })
             }
             EventResult::Ignored => EventResult::Handled,
         }
     }
 
     fn footer_hint(&self) -> Option<Line<'static>> {
-        Some(Line::from(vec![
-            Span::styled("● 提示", Style::default().fg(self.theme.accent)),
-            Span::styled(" 使用 ", Style::default().fg(self.theme.text_dim)),
-            Span::styled("Tab", Style::default().fg(self.theme.text)),
-            Span::styled(" 切换标签", Style::default().fg(self.theme.text_dim)),
-        ]))
+        Some(self.tabs.footer_hint())
     }
 }

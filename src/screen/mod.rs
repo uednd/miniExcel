@@ -3,6 +3,7 @@ pub mod home;
 
 use crossterm::event::{KeyEvent, MouseEvent};
 use ratatui::{Frame, layout::Rect, text::Line};
+use std::path::PathBuf;
 
 /// 事件处理结果。
 pub enum EventResult<T> {
@@ -17,7 +18,9 @@ pub enum EventResult<T> {
 /// 屏幕返回给应用主循环的命令。
 pub enum ScreenCommand {
     /// 打开指定路径的表格编辑器。
-    OpenEditor { path: String },
+    OpenEditor { path: PathBuf },
+    /// 从最近打开列表移除指定路径。
+    RemoveRecent { path: PathBuf },
     /// 返回首页。
     GoHome,
 }
