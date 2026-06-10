@@ -145,8 +145,28 @@ impl Mode for NavigationMode {
 
     fn footer(&self, ctx: &TableContext) -> FooterLine {
         use ratatui::text::Span;
-        FooterLine {
-            hint: Some(Line::from(vec![
+        let hint = if let Some(stats) = ctx.selection_stats() {
+            Line::from(vec![
+                Span::styled("平均值=", Style::default().fg(ctx.theme.accent)),
+                Span::styled(
+                    format!(" {}", format_number(stats.average)),
+                    Style::default().fg(ctx.theme.text_dim),
+                ),
+                Span::styled("  ", Style::default().fg(ctx.theme.text_dim)),
+                Span::styled("求和=", Style::default().fg(ctx.theme.accent)),
+                Span::styled(
+                    format!(" {}", format_number(stats.sum)),
+                    Style::default().fg(ctx.theme.text_dim),
+                ),
+                Span::styled("  ", Style::default().fg(ctx.theme.text_dim)),
+                Span::styled("计数=", Style::default().fg(ctx.theme.accent)),
+                Span::styled(
+                    format!(" {}", stats.count),
+                    Style::default().fg(ctx.theme.text_dim),
+                ),
+            ])
+        } else {
+            Line::from(vec![
                 Span::styled("Ctrl+S", Style::default().fg(ctx.theme.accent)),
                 Span::styled(" 保存", Style::default().fg(ctx.theme.text_dim)),
                 Span::styled("  ", Style::default().fg(ctx.theme.text_dim)),
@@ -155,7 +175,11 @@ impl Mode for NavigationMode {
                 Span::styled("  ", Style::default().fg(ctx.theme.text_dim)),
                 Span::styled("Enter", Style::default().fg(ctx.theme.accent)),
                 Span::styled(" 编辑", Style::default().fg(ctx.theme.text_dim)),
-            ])),
+            ])
+        };
+
+        FooterLine {
+            hint: Some(hint),
             status: Some(Line::from(vec![
                 Span::styled("[", Style::default().fg(ctx.theme.text_dim)),
                 Span::styled(
@@ -207,4 +231,19 @@ impl NavigationMode {
             NavigationKey::Right => ctx.viewport.move_right(ctx.column_count()),
         }
     }
+}
+
+fn format_number(n: f64) -> String {
+    if n == 0.0 {
+        return "0".to_string();
+    }
+
+    let abs = n.abs();
+    if abs < 1e-6 || abs >= 1e12 {
+        return format!("{:.2e}", n);
+    }
+
+    let text = format!("{:.10}", n);
+    let text = text.trim_end_matches('0');
+    text.trim_end_matches('.').to_string()
 }

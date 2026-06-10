@@ -1,5 +1,8 @@
 use crate::{
-    model::{cell::CellAddress, workbook::Workbook},
+    model::{
+        cell::{CellAddress, CellValue},
+        workbook::Workbook,
+    },
     screen::ScreenCommand,
     theme::Theme,
 };
@@ -20,6 +23,14 @@ pub struct TableContext {
     blink_visible: bool,
     /// 模式需要切换屏幕时写入，随后由 `ModeHost` 取走。
     pending_command: Option<ScreenCommand>,
+}
+
+/// 当前选区的统计信息。
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct SelectionStats {
+    pub average: f64,
+    pub sum: f64,
+    pub count: usize,
 }
 
 impl TableContext {
@@ -70,6 +81,52 @@ impl TableContext {
     /// 清除当前选区。
     pub fn clear_selection(&mut self) {
         self.selection = None;
+    }
+
+    /// 统计当前多单元格矩形选区。
+    ///
+    /// `count` 统计有内容的单元格；`sum` 和 `average` 只统计数字。
+    pub fn selection_stats(&self) -> Option<SelectionStats> {
+        let selection = self.selection?;
+        let Selection::Range { .. } = selection else {
+            return None;
+        };
+
+        let (r1, r2, c1, c2) = selection.normalized_bounds(self.wb.rows, self.wb.columns);
+        if r1 == r2 && c1 == c2 {
+            return None;
+        }
+
+        let mut sum = 0.0;
+        let mut number_count = 0;
+        let mut value_count = 0;
+
+        for row in r1..=r2 {
+            for col in c1..=c2 {
+                let addr = CellAddress { row, col };
+                let Some(cell) = self.wb.get_cell(addr) else {
+                    continue;
+                };
+
+                value_count += 1;
+                if let Some(number) = cell_value_as_number(&cell.value) {
+                    sum += number;
+                    number_count += 1;
+                }
+            }
+        }
+
+        let average = if number_count == 0 {
+            0.0
+        } else {
+            sum / number_count as f64
+        };
+
+        Some(SelectionStats {
+            average,
+            sum,
+            count: value_count,
+        })
     }
 
     /// 已复制的区域（用于渲染虚线边框）。
@@ -259,5 +316,13 @@ impl TableContext {
             .get_cell(CellAddress { row, col })
             .map(|cell| cell.raw.clone())
             .unwrap_or_default()
+    }
+}
+
+fn cell_value_as_number(value: &CellValue) -> Option<f64> {
+    match value {
+        CellValue::Number(n) => Some(*n),
+        CellValue::Text(text) => text.parse::<f64>().ok(),
+        CellValue::Empty | CellValue::Error(_) => None,
     }
 }
