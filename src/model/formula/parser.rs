@@ -102,7 +102,9 @@ fn parse_cell_address(s: &str) -> CellAddress {
 fn col_name_to_index(s: &str) -> usize {
     let mut result = 0usize;
     for c in s.chars() {
-        result = result * 26 + (c as usize - 'A' as usize + 1);
+        let index = (c.to_ascii_uppercase() as usize - 'A' as usize) + 1;
+        result = result * 26 + index;
     }
     result.saturating_sub(1)
 }
+
