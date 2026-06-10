@@ -29,16 +29,6 @@ impl Viewport {
         self.cursor
     }
 
-    /// 当前光标所在行。
-    pub fn cursor_row(&self) -> usize {
-        self.cursor.row
-    }
-
-    /// 当前光标所在列。
-    pub fn cursor_col(&self) -> usize {
-        self.cursor.col
-    }
-
     /// 当前垂直滚动偏移。
     pub fn scroll_row(&self) -> usize {
         self.scroll_row

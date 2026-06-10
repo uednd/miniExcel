@@ -10,8 +10,7 @@ use ratatui::{
 use crate::screen::EventResult;
 
 use super::{
-    context::TableContext,
-    mode::{EditorIntent, EditorView, FooterLine, Mode, ModeKind, ModeResult},
+    mode::{EditorIntent, EditorReadModel, EditorView, FooterLine, Mode, ModeKind, ModeResult},
     navigation::NavigationMode,
 };
 
@@ -53,7 +52,7 @@ impl Mode for EditMode {
         }
     }
 
-    fn render(&self, frame: &mut Frame, area: Rect, ctx: &TableContext) -> Rect {
+    fn render(&self, frame: &mut Frame, area: Rect, read: EditorReadModel<'_>) -> Rect {
         use ratatui::text::Span;
 
         let [table_area, edit_area] =
@@ -61,22 +60,22 @@ impl Mode for EditMode {
 
         let mut spans = vec![Span::styled(
             "编辑: ",
-            Style::default().fg(ctx.theme.accent),
+            Style::default().fg(read.theme.accent),
         )];
         if self.buffer.is_empty() {
             spans.push(Span::styled(
                 "(空)",
-                Style::default().fg(ctx.theme.text_dim),
+                Style::default().fg(read.theme.text_dim),
             ));
         } else {
             spans.push(Span::styled(
                 self.buffer.as_str(),
-                Style::default().fg(ctx.theme.text),
+                Style::default().fg(read.theme.text),
             ));
-            let cursor_char = if ctx.blink_visible() { "█" } else { " " };
+            let cursor_char = if read.blink_visible { "█" } else { " " };
             spans.push(Span::styled(
                 cursor_char,
-                Style::default().fg(ctx.theme.text),
+                Style::default().fg(read.theme.text),
             ));
         }
 
@@ -88,24 +87,24 @@ impl Mode for EditMode {
         Some(&self.buffer)
     }
 
-    fn footer(&self, ctx: &TableContext) -> FooterLine {
+    fn footer(&self, read: EditorReadModel<'_>) -> FooterLine {
         use ratatui::text::Span;
         FooterLine {
             hint: Some(Line::from(vec![
-                Span::styled("Enter", Style::default().fg(ctx.theme.accent)),
-                Span::styled(" 确认", Style::default().fg(ctx.theme.text_dim)),
-                Span::styled("  ", Style::default().fg(ctx.theme.text_dim)),
-                Span::styled("Esc", Style::default().fg(ctx.theme.accent)),
-                Span::styled(" 取消", Style::default().fg(ctx.theme.text_dim)),
+                Span::styled("Enter", Style::default().fg(read.theme.accent)),
+                Span::styled(" 确认", Style::default().fg(read.theme.text_dim)),
+                Span::styled("  ", Style::default().fg(read.theme.text_dim)),
+                Span::styled("Esc", Style::default().fg(read.theme.accent)),
+                Span::styled(" 取消", Style::default().fg(read.theme.text_dim)),
             ])),
             status: Some(Line::from(vec![
-                Span::styled("[", Style::default().fg(ctx.theme.text_dim)),
+                Span::styled("[", Style::default().fg(read.theme.text_dim)),
                 Span::styled(
-                    ctx.cursor().display(),
-                    Style::default().fg(ctx.theme.accent),
+                    read.viewport.cursor().display(),
+                    Style::default().fg(read.theme.accent),
                 ),
-                Span::styled(", 编辑模式", Style::default().fg(ctx.theme.text_dim)),
-                Span::styled("]", Style::default().fg(ctx.theme.text_dim)),
+                Span::styled(", 编辑模式", Style::default().fg(read.theme.text_dim)),
+                Span::styled("]", Style::default().fg(read.theme.text_dim)),
             ])),
         }
     }

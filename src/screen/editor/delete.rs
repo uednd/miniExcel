@@ -10,9 +10,8 @@ use ratatui::{
 use crate::screen::EventResult;
 use crate::widget::selectable_list::{SelectableItem, SelectableList};
 
-use super::{
-    context::TableContext,
-    mode::{EditorIntent, EditorView, FooterLine, Mode, ModeKind, ModeResult},
+use super::mode::{
+    EditorIntent, EditorReadModel, EditorView, FooterLine, Mode, ModeKind, ModeResult,
 };
 
 const PANEL_WIDTH: u16 = 20;
@@ -68,32 +67,32 @@ impl Mode for DeleteMode {
         }
     }
 
-    fn render(&self, frame: &mut Frame, area: Rect, ctx: &TableContext) -> Rect {
+    fn render(&self, frame: &mut Frame, area: Rect, read: EditorReadModel<'_>) -> Rect {
         let [table_area, panel_area] =
             Layout::horizontal([Constraint::Fill(1), Constraint::Length(PANEL_WIDTH)]).areas(area);
 
         let panel_block = Block::default()
-            .style(Style::default().bg(ctx.theme.surface_alt))
-            .title(Line::styled("删除", Style::default().fg(ctx.theme.accent)));
+            .style(Style::default().bg(read.theme.surface_alt))
+            .title(Line::styled("删除", Style::default().fg(read.theme.accent)));
         let inner = panel_block.inner(panel_area);
         frame.render_widget(panel_block, panel_area);
-        self.list.render(frame, inner, ctx.theme);
+        self.list.render(frame, inner, read.theme);
 
         table_area
     }
 
-    fn footer(&self, ctx: &TableContext) -> FooterLine {
+    fn footer(&self, read: EditorReadModel<'_>) -> FooterLine {
         use ratatui::text::Span;
         FooterLine {
             hint: Some(Line::from(vec![
-                Span::styled("↑ / ↓", Style::default().fg(ctx.theme.accent)),
-                Span::styled(" 选择", Style::default().fg(ctx.theme.text_dim)),
-                Span::styled("  ", Style::default().fg(ctx.theme.text_dim)),
-                Span::styled("Enter", Style::default().fg(ctx.theme.accent)),
-                Span::styled(" 确认", Style::default().fg(ctx.theme.text_dim)),
-                Span::styled("  ", Style::default().fg(ctx.theme.text_dim)),
-                Span::styled("Esc", Style::default().fg(ctx.theme.accent)),
-                Span::styled(" 取消", Style::default().fg(ctx.theme.text_dim)),
+                Span::styled("↑ / ↓", Style::default().fg(read.theme.accent)),
+                Span::styled(" 选择", Style::default().fg(read.theme.text_dim)),
+                Span::styled("  ", Style::default().fg(read.theme.text_dim)),
+                Span::styled("Enter", Style::default().fg(read.theme.accent)),
+                Span::styled(" 确认", Style::default().fg(read.theme.text_dim)),
+                Span::styled("  ", Style::default().fg(read.theme.text_dim)),
+                Span::styled("Esc", Style::default().fg(read.theme.accent)),
+                Span::styled(" 取消", Style::default().fg(read.theme.text_dim)),
             ])),
             status: None,
         }

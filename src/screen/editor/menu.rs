@@ -10,9 +10,8 @@ use ratatui::{
 use crate::screen::EventResult;
 use crate::widget::selectable_list::{SelectableItem, SelectableList};
 
-use super::{
-    context::TableContext,
-    mode::{EditorIntent, EditorView, FooterLine, Mode, ModeKind, ModeResult},
+use super::mode::{
+    EditorIntent, EditorReadModel, EditorView, FooterLine, Mode, ModeKind, ModeResult,
 };
 
 const MENU_WIDTH: u16 = 20;
@@ -64,30 +63,30 @@ impl Mode for MenuMode {
         }
     }
 
-    fn render(&self, frame: &mut Frame, area: Rect, ctx: &TableContext) -> Rect {
+    fn render(&self, frame: &mut Frame, area: Rect, read: EditorReadModel<'_>) -> Rect {
         let [table_area, menu_area] =
             Layout::horizontal([Constraint::Fill(1), Constraint::Length(MENU_WIDTH)]).areas(area);
 
-        let menu_block = Block::default().style(Style::default().bg(ctx.theme.surface_alt));
+        let menu_block = Block::default().style(Style::default().bg(read.theme.surface_alt));
         let inner = menu_block.inner(menu_area);
         frame.render_widget(menu_block, menu_area);
-        self.list.render(frame, inner, ctx.theme);
+        self.list.render(frame, inner, read.theme);
 
         table_area
     }
 
-    fn footer(&self, ctx: &TableContext) -> FooterLine {
+    fn footer(&self, read: EditorReadModel<'_>) -> FooterLine {
         use ratatui::text::Span;
         FooterLine {
             hint: Some(Line::from(vec![
-                Span::styled("↑ / ↓", Style::default().fg(ctx.theme.accent)),
-                Span::styled(" 选择", Style::default().fg(ctx.theme.text_dim)),
-                Span::styled("  ", Style::default().fg(ctx.theme.text_dim)),
-                Span::styled("Enter", Style::default().fg(ctx.theme.accent)),
-                Span::styled(" 确认", Style::default().fg(ctx.theme.text_dim)),
-                Span::styled("  ", Style::default().fg(ctx.theme.text_dim)),
-                Span::styled("Ctrl+P", Style::default().fg(ctx.theme.accent)),
-                Span::styled(" 关闭", Style::default().fg(ctx.theme.text_dim)),
+                Span::styled("↑ / ↓", Style::default().fg(read.theme.accent)),
+                Span::styled(" 选择", Style::default().fg(read.theme.text_dim)),
+                Span::styled("  ", Style::default().fg(read.theme.text_dim)),
+                Span::styled("Enter", Style::default().fg(read.theme.accent)),
+                Span::styled(" 确认", Style::default().fg(read.theme.text_dim)),
+                Span::styled("  ", Style::default().fg(read.theme.text_dim)),
+                Span::styled("Ctrl+P", Style::default().fg(read.theme.accent)),
+                Span::styled(" 关闭", Style::default().fg(read.theme.text_dim)),
             ])),
             status: None,
         }

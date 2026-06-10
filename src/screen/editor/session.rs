@@ -8,12 +8,13 @@ use crate::{
 };
 
 use super::{
-    context::TableContext,
     delete::DeleteMode,
     menu::MenuMode,
-    mode::{EditorIntent, EditorView, Mode, ModeKind, Selection},
+    mode::{EditorIntent, EditorReadModel, EditorView, Mode, ModeKind, Selection},
     navigation::NavigationMode,
+    state::EditorState,
     viewport::Viewport,
+    workbook_controller::WorkbookController,
 };
 
 /// 表格渲染需要的只读状态。
@@ -32,20 +33,24 @@ pub struct EditorTableParts<'a> {
 /// 会话是编辑器唯一的交互入口：模式只返回意图，保存、提交编辑、
 /// 屏幕命令和跨模式快捷键都在这里统一应用。
 pub struct EditorSession {
-    ctx: TableContext,
+    theme: Theme,
+    state: EditorState,
+    workbook: WorkbookController,
     mode: Box<dyn Mode>,
 }
 
 impl EditorSession {
     pub fn new(theme: Theme, document: WorkbookDocument) -> Self {
         Self {
-            ctx: TableContext::new(theme, document),
+            theme,
+            state: EditorState::new(),
+            workbook: WorkbookController::new(document),
             mode: Box::new(NavigationMode),
         }
     }
 
     pub fn pre_render(&mut self, state: FrameState) {
-        self.ctx.set_blink_visible(state.blink_visible);
+        self.state.set_blink_visible(state.blink_visible);
     }
 
     pub fn handle_key(&mut self, key: KeyEvent) -> EventResult<ScreenCommand> {
@@ -53,7 +58,10 @@ impl EditorSession {
             return result;
         }
 
-        match self.mode.handle_key(EditorView::new(&self.ctx), key) {
+        match self
+            .mode
+            .handle_key(EditorView::new(self.state.selection().copied()), key)
+        {
             EventResult::Handled => EventResult::Handled,
             EventResult::Ignored => EventResult::Ignored,
             EventResult::Command(intent) => self.apply_intent(intent),
@@ -63,19 +71,19 @@ impl EditorSession {
     pub fn handle_scroll(&mut self, event: MouseEvent) -> EventResult<ScreenCommand> {
         match event.kind {
             MouseEventKind::ScrollUp => {
-                self.ctx.scroll_up(3);
+                self.state.scroll_up(3);
                 EventResult::Handled
             }
             MouseEventKind::ScrollDown => {
-                self.ctx.scroll_down(3);
+                self.state.scroll_down(3, self.workbook.row_count());
                 EventResult::Handled
             }
             MouseEventKind::ScrollLeft => {
-                self.ctx.scroll_left(1);
+                self.state.scroll_left(1);
                 EventResult::Handled
             }
             MouseEventKind::ScrollRight => {
-                self.ctx.scroll_right(1);
+                self.state.scroll_right(1, self.workbook.column_count());
                 EventResult::Handled
             }
             _ => EventResult::Ignored,
@@ -83,45 +91,45 @@ impl EditorSession {
     }
 
     pub fn render_mode(&self, frame: &mut Frame, area: Rect) -> Rect {
-        self.mode.render(frame, area, &self.ctx)
+        self.mode.render(frame, area, self.read_model())
     }
 
     pub fn table_parts(&self) -> EditorTableParts<'_> {
         EditorTableParts {
-            workbook: self.ctx.workbook(),
-            viewport: self.ctx.viewport(),
-            theme: self.ctx.theme,
-            blink_visible: self.ctx.blink_visible(),
+            workbook: self.workbook.workbook(),
+            viewport: self.state.viewport(),
+            theme: self.theme,
+            blink_visible: self.state.blink_visible(),
             edit_buffer: self.mode.edit_buffer(),
-            selection: self.ctx.selection(),
-            copied_region: self.ctx.copied_region(),
+            selection: self.state.selection(),
+            copied_region: self.state.copied_region(),
         }
     }
 
     pub fn update_visible_capacity(&mut self, rows: usize, cols: usize) {
-        self.ctx.update_visible_capacity(rows, cols);
+        self.state.update_visible_capacity(rows, cols);
     }
 
     pub fn workbook_name(&self) -> &str {
-        self.ctx.workbook_name()
+        self.workbook.workbook_name()
     }
 
     pub fn theme(&self) -> Theme {
-        self.ctx.theme
+        self.theme
     }
 
     pub fn footer_hint(&self) -> Option<Line<'static>> {
-        self.mode.footer(&self.ctx).hint
+        self.mode.footer(self.read_model()).hint
     }
 
     pub fn footer_status(&self) -> Option<Line<'static>> {
-        if let Some(message) = self.ctx.status_message() {
+        if let Some(message) = self.state.status_message() {
             return Some(Line::styled(
                 message.to_string(),
-                Style::default().fg(self.ctx.theme.accent),
+                Style::default().fg(self.theme.accent),
             ));
         }
-        self.mode.footer(&self.ctx).status
+        self.mode.footer(self.read_model()).status
     }
 
     fn intercept_shortcut(&mut self, key: KeyEvent) -> Option<EventResult<ScreenCommand>> {
@@ -130,7 +138,7 @@ impl EditorSession {
             && self.mode.kind() != ModeKind::Delete
         {
             self.commit_visible_edit_buffer();
-            self.ctx.save();
+            self.save_workbook();
             return Some(EventResult::Handled);
         }
         if Self::is_ctrl_p(key) {
@@ -163,72 +171,113 @@ impl EditorSession {
                 EventResult::Handled
             }
             EditorIntent::MoveCursor(direction) => {
-                self.ctx.move_cursor(direction);
+                self.state.move_cursor(
+                    direction,
+                    self.workbook.row_count(),
+                    self.workbook.column_count(),
+                );
                 EventResult::Handled
             }
             EditorIntent::MoveCursorAndClearSelection(direction) => {
-                self.ctx.move_cursor_and_clear_selection(direction);
+                self.state.move_cursor_and_clear_selection(
+                    direction,
+                    self.workbook.row_count(),
+                    self.workbook.column_count(),
+                );
                 EventResult::Handled
             }
             EditorIntent::StartEdit { initial_char } => {
-                let existing = self.ctx.current_cell_raw();
+                let existing = self.workbook.current_cell_raw(self.state.cursor());
                 self.mode = Box::new(super::edit::EditMode::new(existing, initial_char));
                 EventResult::Handled
             }
             EditorIntent::CommitEdit(raw) => {
-                self.ctx.commit_current_cell(raw);
+                self.workbook.commit_cell(self.state.cursor(), raw);
                 self.mode = Box::new(NavigationMode);
                 EventResult::Handled
             }
             EditorIntent::ClearCurrentCell => {
-                self.ctx.clear_current_cell();
+                self.workbook.clear_cell(self.state.cursor());
                 EventResult::Handled
             }
             EditorIntent::ClearSelectionCells => {
-                self.ctx.clear_selection_cells();
+                if let Some(selection) = self.state.selection().copied() {
+                    self.workbook.clear_selection(selection);
+                    self.state.clear_selection();
+                }
                 EventResult::Handled
             }
             EditorIntent::ClearSelection => {
-                self.ctx.clear_selection();
+                self.state.clear_selection();
                 EventResult::Handled
             }
             EditorIntent::StartRangeSelection(direction) => {
-                self.ctx.start_range_selection(direction);
+                self.state.start_range_selection(
+                    direction,
+                    self.workbook.row_count(),
+                    self.workbook.column_count(),
+                );
                 EventResult::Handled
             }
             EditorIntent::ExtendRangeSelection(direction) => {
-                self.ctx.extend_range_selection(direction);
+                self.state.extend_range_selection(
+                    direction,
+                    self.workbook.row_count(),
+                    self.workbook.column_count(),
+                );
                 EventResult::Handled
             }
             EditorIntent::SelectCurrentRow => {
-                self.ctx.select_current_row();
+                self.state.select_current_row();
                 EventResult::Handled
             }
             EditorIntent::SelectCurrentColumn => {
-                self.ctx.select_current_column();
+                self.state.select_current_column();
                 EventResult::Handled
             }
             EditorIntent::Copy => {
-                if let Err(err) = self.ctx.copy_selection() {
-                    self.ctx.set_status_message(err);
+                let selection = self.state.selection().copied();
+                let cells = self
+                    .workbook
+                    .collect_selection(selection, self.state.cursor());
+                let tsv = crate::clipboard::to_tsv(&cells);
+                if let Err(err) = crate::clipboard::copy_to_clipboard(&tsv) {
+                    self.state.set_status_message(err);
+                } else if let Some(selection) = selection {
+                    self.state.set_copied_region(selection);
+                } else {
+                    let cursor = self.state.cursor();
+                    self.state.set_copied_region(Selection::Range {
+                        anchor: cursor,
+                        cursor,
+                    });
                 }
                 EventResult::Handled
             }
             EditorIntent::Paste => {
-                if let Err(err) = self.ctx.paste_from_clipboard() {
-                    self.ctx.set_status_message(err);
+                match crate::clipboard::read_from_clipboard() {
+                    Ok(text) => {
+                        let rows = crate::clipboard::from_tsv(&text);
+                        if let Some(selection) =
+                            self.workbook.paste_range(self.state.cursor(), &rows)
+                        {
+                            self.state.clear_copied_region();
+                            self.state.set_selection(selection);
+                        }
+                    }
+                    Err(err) => self.state.set_status_message(err),
                 }
                 EventResult::Handled
             }
             EditorIntent::Save => {
                 self.commit_visible_edit_buffer();
-                self.ctx.save();
+                self.save_workbook();
                 self.mode = Box::new(NavigationMode);
                 EventResult::Handled
             }
             EditorIntent::SaveAndGoHome => {
                 self.commit_visible_edit_buffer();
-                if self.ctx.save() {
+                if self.save_workbook() {
                     EventResult::Command(ScreenCommand::GoHome)
                 } else {
                     EventResult::Handled
@@ -236,12 +285,14 @@ impl EditorSession {
             }
             EditorIntent::GoHome => EventResult::Command(ScreenCommand::GoHome),
             EditorIntent::DeleteCurrentRow => {
-                self.ctx.delete_current_row();
+                self.workbook.delete_row(self.state.cursor().row);
+                self.state.clamp_cursor_row(self.workbook.row_count());
                 self.mode = Box::new(NavigationMode);
                 EventResult::Handled
             }
             EditorIntent::DeleteCurrentColumn => {
-                self.ctx.delete_current_column();
+                self.workbook.delete_column(self.state.cursor().col);
+                self.state.clamp_cursor_col(self.workbook.column_count());
                 self.mode = Box::new(NavigationMode);
                 EventResult::Handled
             }
@@ -250,7 +301,31 @@ impl EditorSession {
 
     fn commit_visible_edit_buffer(&mut self) {
         if let Some(raw) = self.mode.edit_buffer().map(str::to_owned) {
-            self.ctx.commit_current_cell(raw);
+            self.workbook.commit_cell(self.state.cursor(), raw);
+        }
+    }
+
+    fn save_workbook(&mut self) -> bool {
+        match self.workbook.save() {
+            Ok(()) => {
+                self.state.set_status_message("已保存");
+                true
+            }
+            Err(err) => {
+                self.state.set_status_message(err.message());
+                false
+            }
+        }
+    }
+
+    fn read_model(&self) -> EditorReadModel<'_> {
+        let selection = self.state.selection().copied();
+        EditorReadModel {
+            theme: self.theme,
+            viewport: self.state.viewport(),
+            blink_visible: self.state.blink_visible(),
+            selection_stats: selection
+                .and_then(|selection| self.workbook.selection_stats(selection)),
         }
     }
 

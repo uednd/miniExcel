@@ -3,11 +3,9 @@ use ratatui::{Frame, layout::Rect, style::Style, text::Line};
 
 use crate::screen::EventResult;
 
-use super::{
-    context::TableContext,
-    mode::{
-        Direction, EditorIntent, EditorView, FooterLine, Mode, ModeKind, ModeResult, Selection,
-    },
+use super::mode::{
+    Direction, EditorIntent, EditorReadModel, EditorView, FooterLine, Mode, ModeKind, ModeResult,
+    Selection,
 };
 
 /// 默认模式 —— 光标导航、单元格删除、进入编辑。
@@ -103,55 +101,55 @@ impl Mode for NavigationMode {
         }
     }
 
-    fn render(&self, _frame: &mut Frame, area: Rect, _ctx: &TableContext) -> Rect {
+    fn render(&self, _frame: &mut Frame, area: Rect, _read: EditorReadModel<'_>) -> Rect {
         area
     }
 
-    fn footer(&self, ctx: &TableContext) -> FooterLine {
+    fn footer(&self, read: EditorReadModel<'_>) -> FooterLine {
         use ratatui::text::Span;
-        let hint = if let Some(stats) = ctx.selection_stats() {
+        let hint = if let Some(stats) = read.selection_stats {
             Line::from(vec![
-                Span::styled("平均值=", Style::default().fg(ctx.theme.accent)),
+                Span::styled("平均值=", Style::default().fg(read.theme.accent)),
                 Span::styled(
                     format!(" {}", format_number(stats.average)),
-                    Style::default().fg(ctx.theme.text_dim),
+                    Style::default().fg(read.theme.text_dim),
                 ),
-                Span::styled("  ", Style::default().fg(ctx.theme.text_dim)),
-                Span::styled("求和=", Style::default().fg(ctx.theme.accent)),
+                Span::styled("  ", Style::default().fg(read.theme.text_dim)),
+                Span::styled("求和=", Style::default().fg(read.theme.accent)),
                 Span::styled(
                     format!(" {}", format_number(stats.sum)),
-                    Style::default().fg(ctx.theme.text_dim),
+                    Style::default().fg(read.theme.text_dim),
                 ),
-                Span::styled("  ", Style::default().fg(ctx.theme.text_dim)),
-                Span::styled("计数=", Style::default().fg(ctx.theme.accent)),
+                Span::styled("  ", Style::default().fg(read.theme.text_dim)),
+                Span::styled("计数=", Style::default().fg(read.theme.accent)),
                 Span::styled(
                     format!(" {}", stats.count),
-                    Style::default().fg(ctx.theme.text_dim),
+                    Style::default().fg(read.theme.text_dim),
                 ),
             ])
         } else {
             Line::from(vec![
-                Span::styled("Ctrl+S", Style::default().fg(ctx.theme.accent)),
-                Span::styled(" 保存", Style::default().fg(ctx.theme.text_dim)),
-                Span::styled("  ", Style::default().fg(ctx.theme.text_dim)),
-                Span::styled("Ctrl+P", Style::default().fg(ctx.theme.accent)),
-                Span::styled(" 菜单", Style::default().fg(ctx.theme.text_dim)),
-                Span::styled("  ", Style::default().fg(ctx.theme.text_dim)),
-                Span::styled("Enter", Style::default().fg(ctx.theme.accent)),
-                Span::styled(" 编辑", Style::default().fg(ctx.theme.text_dim)),
+                Span::styled("Ctrl+S", Style::default().fg(read.theme.accent)),
+                Span::styled(" 保存", Style::default().fg(read.theme.text_dim)),
+                Span::styled("  ", Style::default().fg(read.theme.text_dim)),
+                Span::styled("Ctrl+P", Style::default().fg(read.theme.accent)),
+                Span::styled(" 菜单", Style::default().fg(read.theme.text_dim)),
+                Span::styled("  ", Style::default().fg(read.theme.text_dim)),
+                Span::styled("Enter", Style::default().fg(read.theme.accent)),
+                Span::styled(" 编辑", Style::default().fg(read.theme.text_dim)),
             ])
         };
 
         FooterLine {
             hint: Some(hint),
             status: Some(Line::from(vec![
-                Span::styled("[", Style::default().fg(ctx.theme.text_dim)),
+                Span::styled("[", Style::default().fg(read.theme.text_dim)),
                 Span::styled(
-                    ctx.cursor().display(),
-                    Style::default().fg(ctx.theme.accent),
+                    read.viewport.cursor().display(),
+                    Style::default().fg(read.theme.accent),
                 ),
-                Span::styled(", 光标模式", Style::default().fg(ctx.theme.text_dim)),
-                Span::styled("]", Style::default().fg(ctx.theme.text_dim)),
+                Span::styled(", 光标模式", Style::default().fg(read.theme.text_dim)),
+                Span::styled("]", Style::default().fg(read.theme.text_dim)),
             ])),
         }
     }

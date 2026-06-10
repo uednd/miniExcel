@@ -1,9 +1,8 @@
 use crossterm::event::KeyEvent;
 use ratatui::{Frame, layout::Rect, text::Line};
 
-use super::context::TableContext;
-use crate::model::cell::CellAddress;
-use crate::screen::EventResult;
+use super::{viewport::Viewport, workbook_controller::SelectionStats};
+use crate::{model::cell::CellAddress, screen::EventResult, theme::Theme};
 
 /// 编辑器方向键方向。
 #[derive(Clone, Copy)]
@@ -18,17 +17,29 @@ pub enum Direction {
 ///
 /// `EditorView` 只暴露只读信息，避免模式直接修改编辑器状态。
 pub struct EditorView<'a> {
-    ctx: &'a TableContext,
+    selection: Option<Selection>,
+    _marker: std::marker::PhantomData<&'a ()>,
 }
 
 impl<'a> EditorView<'a> {
-    pub fn new(ctx: &'a TableContext) -> Self {
-        Self { ctx }
+    pub fn new(selection: Option<Selection>) -> Self {
+        Self {
+            selection,
+            _marker: std::marker::PhantomData,
+        }
     }
 
     pub fn selection(&self) -> Option<Selection> {
-        self.ctx.selection().copied()
+        self.selection
     }
+}
+
+/// 模式渲染和 footer 需要的只读模型。
+pub struct EditorReadModel<'a> {
+    pub theme: Theme,
+    pub viewport: &'a Viewport,
+    pub blink_visible: bool,
+    pub selection_stats: Option<SelectionStats>,
 }
 
 /// 编辑器模式产生的意图。
@@ -151,11 +162,11 @@ pub trait Mode {
     /// 渲染模式专属内容，并返回留给表格区域的区域。
     ///
     /// 例如菜单模式会占用右侧面板，编辑模式会占用底部输入行。
-    fn render(&self, frame: &mut Frame, area: Rect, ctx: &TableContext) -> Rect;
+    fn render(&self, frame: &mut Frame, area: Rect, read: EditorReadModel<'_>) -> Rect;
 
     /// 返回当前模式的页脚文本。
-    fn footer(&self, ctx: &TableContext) -> FooterLine {
-        let _ = ctx;
+    fn footer(&self, read: EditorReadModel<'_>) -> FooterLine {
+        let _ = read;
         FooterLine::none()
     }
 

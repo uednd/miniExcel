@@ -11,10 +11,7 @@ use ratatui::{
     widgets::{Cell, Row, Table},
 };
 
-use crate::{
-    model::cell::col_name,
-    theme::Theme,
-};
+use crate::{model::cell::col_name, theme::Theme};
 
 use self::{
     layout::GridLayout,

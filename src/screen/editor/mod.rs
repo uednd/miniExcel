@@ -1,11 +1,12 @@
-mod context;
 mod delete;
 mod edit;
 mod menu;
 mod mode;
 mod navigation;
 mod session;
+mod state;
 mod viewport;
+mod workbook_controller;
 
 use crossterm::event::{KeyEvent, MouseEvent};
 use ratatui::{Frame, layout::Rect, style::Style, widgets::Block};

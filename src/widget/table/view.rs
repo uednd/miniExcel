@@ -37,7 +37,12 @@ impl GridSelection {
                 max_row,
                 min_col,
                 max_col,
-            } => addr.row >= min_row && addr.row <= max_row && addr.col >= min_col && addr.col <= max_col,
+            } => {
+                addr.row >= min_row
+                    && addr.row <= max_row
+                    && addr.col >= min_col
+                    && addr.col <= max_col
+            }
         }
     }
 }
