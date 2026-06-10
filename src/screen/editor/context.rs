@@ -7,7 +7,10 @@ use crate::{
     theme::Theme,
 };
 
-use super::{mode::Selection, viewport::Viewport};
+use super::{
+    mode::{Direction, Selection},
+    viewport::Viewport,
+};
 
 /// 编辑器屏幕共享状态。
 ///
@@ -15,7 +18,7 @@ use super::{mode::Selection, viewport::Viewport};
 /// 但涉及多步不变量的操作应优先通过方法完成，例如删除当前行列。
 pub struct TableContext {
     pub theme: Theme,
-    pub viewport: Viewport,
+    viewport: Viewport,
     document: WorkbookDocument,
     selection: Option<Selection>,
     copied_region: Option<Selection>,
@@ -65,19 +68,97 @@ impl TableContext {
         self.document.workbook().columns
     }
 
+    /// 当前视口。
+    pub fn viewport(&self) -> &Viewport {
+        &self.viewport
+    }
+
+    /// 更新可见表格容量。
+    pub fn update_visible_capacity(&mut self, rows: usize, cols: usize) {
+        self.viewport.update_visible(rows, cols);
+    }
+
+    /// 向上滚动。
+    pub fn scroll_up(&mut self, rows: usize) {
+        self.viewport.scroll_up(rows);
+    }
+
+    /// 向下滚动。
+    pub fn scroll_down(&mut self, rows: usize) {
+        self.viewport.scroll_down(rows, self.row_count());
+    }
+
+    /// 向左滚动。
+    pub fn scroll_left(&mut self, cols: usize) {
+        self.viewport.scroll_left(cols);
+    }
+
+    /// 向右滚动。
+    pub fn scroll_right(&mut self, cols: usize) {
+        self.viewport.scroll_right(cols, self.column_count());
+    }
+
+    /// 当前光标地址。
+    pub fn cursor(&self) -> CellAddress {
+        self.viewport.cursor()
+    }
+
     /// 当前选区。
     pub fn selection(&self) -> Option<&Selection> {
         self.selection.as_ref()
     }
 
-    /// 设置当前选区。
-    pub fn set_selection(&mut self, selection: Selection) {
-        self.selection = Some(selection);
-    }
-
     /// 清除当前选区。
     pub fn clear_selection(&mut self) {
         self.selection = None;
+    }
+
+    /// 移动光标。
+    pub fn move_cursor(&mut self, direction: Direction) {
+        match direction {
+            Direction::Up => self.viewport.move_up(),
+            Direction::Down => self.viewport.move_down(self.row_count()),
+            Direction::Left => self.viewport.move_left(),
+            Direction::Right => self.viewport.move_right(self.column_count()),
+        }
+    }
+
+    /// 清除选区后移动光标。
+    pub fn move_cursor_and_clear_selection(&mut self, direction: Direction) {
+        self.clear_selection();
+        self.move_cursor(direction);
+    }
+
+    /// 从当前光标开始创建范围选区。
+    pub fn start_range_selection(&mut self, direction: Direction) {
+        let anchor = self.cursor();
+        self.move_cursor(direction);
+        self.selection = Some(Selection::Range {
+            anchor,
+            cursor: self.cursor(),
+        });
+    }
+
+    /// 扩展当前范围选区。
+    pub fn extend_range_selection(&mut self, direction: Direction) {
+        let Some(Selection::Range { anchor, .. }) = self.selection else {
+            return;
+        };
+        self.move_cursor(direction);
+        self.selection = Some(Selection::Range {
+            anchor,
+            cursor: self.cursor(),
+        });
+    }
+
+    /// 选中当前行。
+    pub fn select_current_row(&mut self) {
+        self.selection = Some(Selection::Row(self.cursor().row));
+    }
+
+    /// 选中当前列。
+    pub fn select_current_column(&mut self) {
+        self.selection = Some(Selection::Column(self.cursor().col));
     }
 
     /// 统计当前多单元格矩形选区。
@@ -267,7 +348,7 @@ impl TableContext {
             .saturating_sub(1);
 
         self.copied_region = None;
-        self.set_selection(Selection::Range {
+        self.selection = Some(Selection::Range {
             anchor: start,
             cursor: CellAddress {
                 row: end_row,

@@ -5,6 +5,32 @@ use super::context::TableContext;
 use crate::model::cell::CellAddress;
 use crate::screen::EventResult;
 
+/// 编辑器方向键方向。
+#[derive(Clone, Copy)]
+pub enum Direction {
+    Up,
+    Down,
+    Left,
+    Right,
+}
+
+/// 模式处理按键时可读取的编辑器快照。
+///
+/// `EditorView` 只暴露只读信息，避免模式直接修改编辑器状态。
+pub struct EditorView<'a> {
+    ctx: &'a TableContext,
+}
+
+impl<'a> EditorView<'a> {
+    pub fn new(ctx: &'a TableContext) -> Self {
+        Self { ctx }
+    }
+
+    pub fn selection(&self) -> Option<Selection> {
+        self.ctx.selection().copied()
+    }
+}
+
 /// 编辑器模式产生的意图。
 ///
 /// 模式只描述“用户想做什么”，具体如何修改工作簿、保存或切换屏幕，
@@ -12,8 +38,32 @@ use crate::screen::EventResult;
 pub enum EditorIntent {
     /// 切换到另一个编辑器模式。
     SwitchMode(Box<dyn Mode>),
+    /// 移动光标。
+    MoveCursor(Direction),
+    /// 清除选区后移动光标。
+    MoveCursorAndClearSelection(Direction),
+    /// 进入编辑模式。
+    StartEdit { initial_char: Option<char> },
     /// 提交当前单元格的编辑文本。
     CommitEdit(String),
+    /// 清除当前单元格。
+    ClearCurrentCell,
+    /// 清除当前选区内的单元格。
+    ClearSelectionCells,
+    /// 清除当前选区。
+    ClearSelection,
+    /// 从当前光标开始创建范围选区。
+    StartRangeSelection(Direction),
+    /// 扩展现有范围选区。
+    ExtendRangeSelection(Direction),
+    /// 选中当前行。
+    SelectCurrentRow,
+    /// 选中当前列。
+    SelectCurrentColumn,
+    /// 复制当前选区或当前单元格。
+    Copy,
+    /// 从剪贴板粘贴。
+    Paste,
     /// 保存当前工作簿。
     Save,
     /// 保存成功后返回首页。
@@ -108,7 +158,7 @@ pub trait Mode {
     fn kind(&self) -> ModeKind;
 
     /// 处理一个按键事件。
-    fn handle_key(&mut self, ctx: &mut TableContext, key: KeyEvent) -> ModeResult;
+    fn handle_key(&mut self, view: EditorView<'_>, key: KeyEvent) -> ModeResult;
 
     /// 渲染模式专属内容，并返回留给表格区域的区域。
     ///

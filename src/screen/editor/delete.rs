@@ -12,7 +12,7 @@ use crate::widget::selectable_list::{SelectableItem, SelectableList};
 
 use super::{
     context::TableContext,
-    mode::{EditorIntent, FooterLine, Mode, ModeKind, ModeResult},
+    mode::{EditorIntent, EditorView, FooterLine, Mode, ModeKind, ModeResult},
 };
 
 const PANEL_WIDTH: u16 = 20;
@@ -44,7 +44,7 @@ impl Mode for DeleteMode {
         ModeKind::Delete
     }
 
-    fn handle_key(&mut self, _ctx: &mut TableContext, key: KeyEvent) -> ModeResult {
+    fn handle_key(&mut self, _view: EditorView<'_>, key: KeyEvent) -> ModeResult {
         match key.code {
             KeyCode::Up => {
                 self.list.handle_up();

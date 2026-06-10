@@ -11,7 +11,7 @@ use super::{
     context::TableContext,
     delete::DeleteMode,
     menu::MenuMode,
-    mode::{EditorIntent, Mode, ModeKind, Selection},
+    mode::{EditorIntent, EditorView, Mode, ModeKind, Selection},
     navigation::NavigationMode,
     viewport::Viewport,
 };
@@ -53,7 +53,7 @@ impl EditorSession {
             return result;
         }
 
-        match self.mode.handle_key(&mut self.ctx, key) {
+        match self.mode.handle_key(EditorView::new(&self.ctx), key) {
             EventResult::Handled => EventResult::Handled,
             EventResult::Ignored => EventResult::Ignored,
             EventResult::Command(intent) => self.apply_intent(intent),
@@ -63,19 +63,19 @@ impl EditorSession {
     pub fn handle_scroll(&mut self, event: MouseEvent) -> EventResult<ScreenCommand> {
         match event.kind {
             MouseEventKind::ScrollUp => {
-                self.ctx.viewport.scroll_up(3);
+                self.ctx.scroll_up(3);
                 EventResult::Handled
             }
             MouseEventKind::ScrollDown => {
-                self.ctx.viewport.scroll_down(3, self.ctx.row_count());
+                self.ctx.scroll_down(3);
                 EventResult::Handled
             }
             MouseEventKind::ScrollLeft => {
-                self.ctx.viewport.scroll_left(1);
+                self.ctx.scroll_left(1);
                 EventResult::Handled
             }
             MouseEventKind::ScrollRight => {
-                self.ctx.viewport.scroll_right(1, self.ctx.column_count());
+                self.ctx.scroll_right(1);
                 EventResult::Handled
             }
             _ => EventResult::Ignored,
@@ -89,7 +89,7 @@ impl EditorSession {
     pub fn table_parts(&self) -> EditorTableParts<'_> {
         EditorTableParts {
             workbook: self.ctx.workbook(),
-            viewport: &self.ctx.viewport,
+            viewport: self.ctx.viewport(),
             theme: self.ctx.theme,
             blink_visible: self.ctx.blink_visible(),
             edit_buffer: self.mode.edit_buffer(),
@@ -99,7 +99,7 @@ impl EditorSession {
     }
 
     pub fn update_visible_capacity(&mut self, rows: usize, cols: usize) {
-        self.ctx.viewport.update_visible(rows, cols);
+        self.ctx.update_visible_capacity(rows, cols);
     }
 
     pub fn workbook_name(&self) -> &str {
@@ -148,16 +148,10 @@ impl EditorSession {
             return Some(EventResult::Handled);
         }
         if Self::is_ctrl_c(key) && self.mode.kind() == ModeKind::Navigation {
-            if let Err(err) = self.ctx.copy_selection() {
-                self.ctx.set_status_message(err);
-            }
-            return Some(EventResult::Handled);
+            return Some(self.apply_intent(EditorIntent::Copy));
         }
         if Self::is_ctrl_v(key) && self.mode.kind() == ModeKind::Navigation {
-            if let Err(err) = self.ctx.paste_from_clipboard() {
-                self.ctx.set_status_message(err);
-            }
-            return Some(EventResult::Handled);
+            return Some(self.apply_intent(EditorIntent::Paste));
         }
         None
     }
@@ -168,9 +162,62 @@ impl EditorSession {
                 self.mode = new_mode;
                 EventResult::Handled
             }
+            EditorIntent::MoveCursor(direction) => {
+                self.ctx.move_cursor(direction);
+                EventResult::Handled
+            }
+            EditorIntent::MoveCursorAndClearSelection(direction) => {
+                self.ctx.move_cursor_and_clear_selection(direction);
+                EventResult::Handled
+            }
+            EditorIntent::StartEdit { initial_char } => {
+                let existing = self.ctx.current_cell_raw();
+                self.mode = Box::new(super::edit::EditMode::new(existing, initial_char));
+                EventResult::Handled
+            }
             EditorIntent::CommitEdit(raw) => {
                 self.ctx.commit_current_cell(raw);
                 self.mode = Box::new(NavigationMode);
+                EventResult::Handled
+            }
+            EditorIntent::ClearCurrentCell => {
+                self.ctx.clear_current_cell();
+                EventResult::Handled
+            }
+            EditorIntent::ClearSelectionCells => {
+                self.ctx.clear_selection_cells();
+                EventResult::Handled
+            }
+            EditorIntent::ClearSelection => {
+                self.ctx.clear_selection();
+                EventResult::Handled
+            }
+            EditorIntent::StartRangeSelection(direction) => {
+                self.ctx.start_range_selection(direction);
+                EventResult::Handled
+            }
+            EditorIntent::ExtendRangeSelection(direction) => {
+                self.ctx.extend_range_selection(direction);
+                EventResult::Handled
+            }
+            EditorIntent::SelectCurrentRow => {
+                self.ctx.select_current_row();
+                EventResult::Handled
+            }
+            EditorIntent::SelectCurrentColumn => {
+                self.ctx.select_current_column();
+                EventResult::Handled
+            }
+            EditorIntent::Copy => {
+                if let Err(err) = self.ctx.copy_selection() {
+                    self.ctx.set_status_message(err);
+                }
+                EventResult::Handled
+            }
+            EditorIntent::Paste => {
+                if let Err(err) = self.ctx.paste_from_clipboard() {
+                    self.ctx.set_status_message(err);
+                }
                 EventResult::Handled
             }
             EditorIntent::Save => {

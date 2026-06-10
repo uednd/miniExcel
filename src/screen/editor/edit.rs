@@ -11,7 +11,7 @@ use crate::screen::EventResult;
 
 use super::{
     context::TableContext,
-    mode::{EditorIntent, FooterLine, Mode, ModeKind, ModeResult},
+    mode::{EditorIntent, EditorView, FooterLine, Mode, ModeKind, ModeResult},
     navigation::NavigationMode,
 };
 
@@ -35,12 +35,9 @@ impl Mode for EditMode {
         ModeKind::Edit
     }
 
-    fn handle_key(&mut self, ctx: &mut TableContext, key: KeyEvent) -> ModeResult {
+    fn handle_key(&mut self, _view: EditorView<'_>, key: KeyEvent) -> ModeResult {
         match key.code {
-            KeyCode::Enter => {
-                let _ = ctx;
-                EventResult::Command(EditorIntent::CommitEdit(self.buffer.clone()))
-            }
+            KeyCode::Enter => EventResult::Command(EditorIntent::CommitEdit(self.buffer.clone())),
             KeyCode::Esc => {
                 EventResult::Command(EditorIntent::SwitchMode(Box::new(NavigationMode)))
             }
@@ -104,7 +101,7 @@ impl Mode for EditMode {
             status: Some(Line::from(vec![
                 Span::styled("[", Style::default().fg(ctx.theme.text_dim)),
                 Span::styled(
-                    ctx.viewport.cursor().display(),
+                    ctx.cursor().display(),
                     Style::default().fg(ctx.theme.accent),
                 ),
                 Span::styled(", 编辑模式", Style::default().fg(ctx.theme.text_dim)),
