@@ -29,7 +29,10 @@ impl<'a> Evaluator<'a> {
 
     pub fn eval_cell(&mut self, addr: CellAddress) -> Result<CellValue, CellError> {
         if let Some(val) = self.memo.get(&addr) {
-            return Ok(val.clone());
+            return match val {
+                CellValue::Error(e) => Err(e.clone()),
+                _ => Ok(val.clone()),
+            };
         }
 
         if self.evaluating.contains(&addr) {

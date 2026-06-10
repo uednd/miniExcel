@@ -107,4 +107,3 @@ fn col_name_to_index(s: &str) -> usize {
     }
     result.saturating_sub(1)
 }
-
