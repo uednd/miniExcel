@@ -70,6 +70,7 @@ impl Screen for TableScreen {
 
         let edit_buffer = self.host.edit_buffer();
         let selection = self.ctx.selection();
+        let copied_region = self.ctx.copied_region();
         TableGrid::render(
             frame,
             inner,
@@ -79,6 +80,7 @@ impl Screen for TableScreen {
                 theme: self.ctx.theme,
                 edit_buffer,
                 selection,
+                copied_region,
             },
         );
     }

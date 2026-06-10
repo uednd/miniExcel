@@ -32,6 +32,7 @@ pub struct TableGridConfig<'a> {
     pub theme: Theme,
     pub edit_buffer: Option<&'a str>,
     pub selection: Option<&'a Selection>,
+    pub copied_region: Option<&'a Selection>,
 }
 
 impl TableGrid {
@@ -126,7 +127,7 @@ impl TableGrid {
 
         draw_grid(frame, area, visible_cols, grid_style);
 
-        // 绘制选中行/列边框
+        // 绘制选区边框（实线）
         if let Some(sel) = cfg.selection {
             draw_selection_border(
                 frame,
@@ -136,23 +137,27 @@ impl TableGrid {
                 vp.scroll_col(),
                 (row_end - vp.scroll_row(), col_end - vp.scroll_col()),
                 Style::default().fg(cfg.theme.accent),
+                false,
             );
         }
 
-        // 绘制选中单元格高亮边框（若光标在选中行/列内则跳过，避免边框重叠）
-        let overlap = match cfg.selection {
-            Some(Selection::Row(r)) => *r == cursor.row,
-            Some(Selection::Column(c)) => *c == cursor.col,
-            Some(Selection::Range { anchor, cursor }) => {
-                let c1 = anchor.col.min(cursor.col);
-                let c2 = anchor.col.max(cursor.col);
-                let r1 = anchor.row.min(cursor.row);
-                let r2 = anchor.row.max(cursor.row);
-                cursor.col >= c1 && cursor.col <= c2 && cursor.row >= r1 && cursor.row <= r2
-            }
-            _ => false,
-        };
-        if !overlap
+        // 绘制已复制区域边框（虚线）
+        if let Some(region) = cfg.copied_region {
+            draw_selection_border(
+                frame,
+                area,
+                region,
+                vp.scroll_row(),
+                vp.scroll_col(),
+                (row_end - vp.scroll_row(), col_end - vp.scroll_col()),
+                Style::default().fg(cfg.theme.accent),
+                true,
+            );
+        }
+
+        // 光标单元格高亮边框（若光标在选区内则跳过，复制区域不阻挡光标边框）
+        let in_selection = cursor_in_region(cursor, cfg.selection);
+        if !in_selection
             && cursor.row >= vp.scroll_row()
             && cursor.row < vp.scroll_row() + visible_rows
             && cursor.col >= vp.scroll_col()
@@ -242,6 +247,7 @@ fn draw_cell_border(
 }
 
 /// 绘制选中行/列的边框，覆盖在网格线之上、光标单元格边框之下。
+#[allow(clippy::too_many_arguments)]
 fn draw_selection_border(
     frame: &mut Frame,
     area: Rect,
@@ -250,9 +256,15 @@ fn draw_selection_border(
     scroll_col: usize,
     visible_range: (usize, usize),
     style: Style,
+    copied: bool,
 ) {
     let buffer = frame.buffer_mut();
     let (visible_rows, visible_cols) = visible_range;
+    let (h_line, v_line) = if copied {
+        ("╌", "╎")
+    } else {
+        ("━", "┃")
+    };
     match *selection {
         Selection::Row(r) => {
             if r < scroll_row || r >= scroll_row + visible_rows {
@@ -264,8 +276,8 @@ fn draw_selection_border(
                 return;
             }
             for x in area.x..col_grid_x(area, visible_cols).min(area.right()) {
-                buffer[(x, top)].set_symbol("━").set_style(style);
-                buffer[(x, bottom)].set_symbol("━").set_style(style);
+                buffer[(x, top)].set_symbol(h_line).set_style(style);
+                buffer[(x, bottom)].set_symbol(h_line).set_style(style);
             }
         }
         Selection::Column(c) => {
@@ -280,8 +292,8 @@ fn draw_selection_border(
                 return;
             }
             for y in top..bottom {
-                buffer[(left, y)].set_symbol("┃").set_style(style);
-                buffer[(right, y)].set_symbol("┃").set_style(style);
+                buffer[(left, y)].set_symbol(v_line).set_style(style);
+                buffer[(right, y)].set_symbol(v_line).set_style(style);
             }
         }
         Selection::Range { anchor, cursor } => {
@@ -311,12 +323,12 @@ fn draw_selection_border(
             buffer[(left, bottom)].set_symbol("┗").set_style(style);
             buffer[(right, bottom)].set_symbol("┛").set_style(style);
             for x in left + 1..right {
-                buffer[(x, top)].set_symbol("━").set_style(style);
-                buffer[(x, bottom)].set_symbol("━").set_style(style);
+                buffer[(x, top)].set_symbol(h_line).set_style(style);
+                buffer[(x, bottom)].set_symbol(h_line).set_style(style);
             }
             for y in top + 1..bottom {
-                buffer[(left, y)].set_symbol("┃").set_style(style);
-                buffer[(right, y)].set_symbol("┃").set_style(style);
+                buffer[(left, y)].set_symbol(v_line).set_style(style);
+                buffer[(right, y)].set_symbol(v_line).set_style(style);
             }
         }
     }
@@ -332,5 +344,21 @@ fn cell_text(wb: &Workbook, col: usize, row: usize) -> String {
         }
     } else {
         String::new()
+    }
+}
+
+/// 检查游标是否在指定选区内。
+fn cursor_in_region(cursor: CellAddress, region: Option<&Selection>) -> bool {
+    match region {
+        Some(Selection::Row(r)) => *r == cursor.row,
+        Some(Selection::Column(c)) => *c == cursor.col,
+        Some(Selection::Range { anchor, cursor: c }) => {
+            let c1 = anchor.col.min(c.col);
+            let c2 = anchor.col.max(c.col);
+            let r1 = anchor.row.min(c.row);
+            let r2 = anchor.row.max(c.row);
+            cursor.col >= c1 && cursor.col <= c2 && cursor.row >= r1 && cursor.row <= r2
+        }
+        None => false,
     }
 }

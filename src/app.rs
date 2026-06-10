@@ -101,8 +101,8 @@ impl App {
     }
 
     fn dispatch_key(&mut self, key: crossterm::event::KeyEvent) {
-        if key.code == KeyCode::Char('c') && key.modifiers.contains(KeyModifiers::CONTROL) {
-            self.exit_handler.press_ctrl_c();
+        if key.code == KeyCode::Char('q') && key.modifiers.contains(KeyModifiers::CONTROL) {
+            self.exit_handler.press_ctrl_q();
             return;
         }
         match self.active_screen.handle_key(key) {

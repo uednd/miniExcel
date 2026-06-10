@@ -23,7 +23,7 @@ impl ExitHandler {
         }
     }
 
-    pub fn press_ctrl_c(&mut self) {
+    pub fn press_ctrl_q(&mut self) {
         let now = Instant::now();
         self.state = match self.state {
             State::Idle => State::ConfirmOnce(now),
@@ -67,7 +67,7 @@ impl ExitHandler {
 
     pub fn hint_text(&self) -> Option<&'static str> {
         if matches!(self.state, State::ConfirmOnce(_)) {
-            Some("再次按下 Ctrl+C 以退出")
+            Some("再次按下 Ctrl+Q 以退出")
         } else {
             None
         }

@@ -5,6 +5,7 @@ use std::io;
 use std::path::Path;
 
 use super::cell::{Cell, CellAddress, CellValue};
+use super::limits;
 
 /// 清空单元格内容的范围。
 ///
@@ -92,6 +93,14 @@ impl Workbook {
     /// 清除指定地址的单元格内容。
     pub fn clear_cell(&mut self, addr: CellAddress) {
         self.cells.remove(&addr);
+    }
+
+    /// 确保表格行列数不小于指定值。
+    ///
+    /// 粘贴时自动扩展表格。不会超过最大行列限制。
+    pub fn ensure_size(&mut self, rows: usize, cols: usize) {
+        self.rows = self.rows.max(rows).min(limits::MAX_ROWS);
+        self.columns = self.columns.max(cols).min(limits::MAX_COLUMNS);
     }
 
     /// 删除指定行，该行上方的行不动，下方行上移，总行数减一。

@@ -94,6 +94,14 @@ impl ModeHost {
             self.mode = Box::new(DeleteMode::new());
             return Some(EventResult::Handled);
         }
+        if Self::is_ctrl_c(key) && self.mode.kind() == ModeKind::Navigation {
+            let _ = ctx.copy_selection();
+            return Some(EventResult::Handled);
+        }
+        if Self::is_ctrl_v(key) && self.mode.kind() == ModeKind::Navigation {
+            let _ = ctx.paste_from_clipboard();
+            return Some(EventResult::Handled);
+        }
         None
     }
 
@@ -107,5 +115,13 @@ impl ModeHost {
 
     fn is_ctrl_d(key: KeyEvent) -> bool {
         key.code == KeyCode::Char('d') && key.modifiers.contains(KeyModifiers::CONTROL)
+    }
+
+    fn is_ctrl_c(key: KeyEvent) -> bool {
+        key.code == KeyCode::Char('c') && key.modifiers.contains(KeyModifiers::CONTROL)
+    }
+
+    fn is_ctrl_v(key: KeyEvent) -> bool {
+        key.code == KeyCode::Char('v') && key.modifiers.contains(KeyModifiers::CONTROL)
     }
 }
