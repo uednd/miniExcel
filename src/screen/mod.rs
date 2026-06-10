@@ -1,5 +1,6 @@
 pub mod editor;
 pub mod home;
+pub mod home_flow;
 
 use crossterm::event::{KeyEvent, MouseEvent};
 use ratatui::{Frame, layout::Rect, text::Line};

@@ -1,6 +1,5 @@
 use std::path::PathBuf;
 
-use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
     Frame,
     layout::{Constraint, Layout, Rect},
@@ -9,12 +8,7 @@ use ratatui::{
     widgets::{List, ListItem, ListState, Paragraph},
 };
 
-use crate::{model::recent::RecentFile, screen::EventResult, theme::Theme};
-
-pub enum RecentListCommand {
-    Open(PathBuf),
-    Remove(PathBuf),
-}
+use crate::{model::recent::RecentFile, theme::Theme};
 
 pub struct RecentList {
     files: Vec<RecentFile>,
@@ -28,6 +22,22 @@ impl RecentList {
 
     pub fn is_empty(&self) -> bool {
         self.files.is_empty()
+    }
+
+    pub fn selected_path(&self) -> Option<PathBuf> {
+        self.files.get(self.selected).map(|file| file.path.clone())
+    }
+
+    pub fn move_up(&mut self) {
+        if self.selected > 0 {
+            self.selected -= 1;
+        }
+    }
+
+    pub fn move_down(&mut self) {
+        if self.selected + 1 < self.files.len() {
+            self.selected += 1;
+        }
     }
 
     pub fn render(&self, frame: &mut Frame, area: Rect, theme: Theme) {
@@ -61,40 +71,6 @@ impl RecentList {
         let mut state = ListState::default();
         state.select(Some(self.selected.min(self.files.len().saturating_sub(1))));
         frame.render_stateful_widget(list, area, &mut state);
-    }
-
-    pub fn handle_key(&mut self, key: KeyEvent) -> EventResult<RecentListCommand> {
-        if self.files.is_empty() {
-            return EventResult::Ignored;
-        }
-
-        match key.code {
-            KeyCode::Up => {
-                if self.selected > 0 {
-                    self.selected -= 1;
-                }
-                EventResult::Handled
-            }
-            KeyCode::Down => {
-                if self.selected + 1 < self.files.len() {
-                    self.selected += 1;
-                }
-                EventResult::Handled
-            }
-            KeyCode::Enter => {
-                let path = self.files[self.selected].path.clone();
-                if path.exists() {
-                    EventResult::Command(RecentListCommand::Open(path))
-                } else {
-                    EventResult::Command(RecentListCommand::Remove(path))
-                }
-            }
-            KeyCode::Delete | KeyCode::Backspace => {
-                let path = self.files[self.selected].path.clone();
-                EventResult::Command(RecentListCommand::Remove(path))
-            }
-            _ => EventResult::Ignored,
-        }
     }
 }
 

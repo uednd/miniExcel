@@ -7,20 +7,17 @@ use ratatui::{
 use std::path::PathBuf;
 
 use crate::{
-    model::{document::resolve_table_path, recent::RecentFile},
+    model::recent::RecentFile,
+    screen::home_flow::{HomeAction, HomeFlow},
     theme::Theme,
-    widget::{
-        logo::{LOGO_HEIGHT, Logo},
-        tabs::{TabCommand, Tabs},
-    },
+    widget::logo::{LOGO_HEIGHT, Logo},
 };
 
 use super::{EventResult, Screen, ScreenCommand};
 
 pub struct MenuScreen {
-    cwd: PathBuf,
     logo: Logo,
-    tabs: Tabs,
+    flow: HomeFlow,
     status_message: Option<String>,
 }
 
@@ -36,9 +33,8 @@ impl MenuScreen {
         status_message: Option<String>,
     ) -> Self {
         Self {
-            cwd,
             logo: Logo::new(theme),
-            tabs: Tabs::new(theme, recent_files),
+            flow: HomeFlow::new(theme, cwd, recent_files),
             status_message,
         }
     }
@@ -56,20 +52,16 @@ impl Screen for MenuScreen {
         .areas(area);
 
         self.logo.render(frame, logo_area);
-        self.tabs.render(frame, body_area);
+        self.flow.render(frame, body_area);
     }
 
     fn handle_key(&mut self, key: KeyEvent) -> EventResult<ScreenCommand> {
-        match self.tabs.handle_key(key) {
+        match self.flow.handle_key(key) {
             EventResult::Handled => EventResult::Handled,
-            EventResult::Command(TabCommand::OpenTable(input)) => {
-                let path = resolve_table_path(&input, &self.cwd);
+            EventResult::Command(HomeAction::Open(path)) => {
                 EventResult::Command(ScreenCommand::OpenEditor { path })
             }
-            EventResult::Command(TabCommand::OpenRecent(path)) => {
-                EventResult::Command(ScreenCommand::OpenEditor { path })
-            }
-            EventResult::Command(TabCommand::RemoveRecent(path)) => {
+            EventResult::Command(HomeAction::RemoveRecent(path)) => {
                 EventResult::Command(ScreenCommand::RemoveRecent { path })
             }
             EventResult::Ignored => EventResult::Handled,
@@ -77,7 +69,7 @@ impl Screen for MenuScreen {
     }
 
     fn footer_hint(&self) -> Option<Line<'static>> {
-        Some(self.tabs.footer_hint())
+        Some(self.flow.footer_hint())
     }
 
     fn footer_status(&self) -> Option<Line<'static>> {

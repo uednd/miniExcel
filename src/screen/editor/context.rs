@@ -176,12 +176,6 @@ impl TableContext {
         self.status_message = Some(message.into());
     }
 
-    /// 清除底部状态栏消息。
-    #[allow(dead_code)]
-    pub fn clear_status_message(&mut self) {
-        self.status_message = None;
-    }
-
     /// 写入光标所在单元格的文本。
     pub fn commit_current_cell(&mut self, raw: String) {
         self.document
