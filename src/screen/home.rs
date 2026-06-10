@@ -7,7 +7,7 @@ use ratatui::{
 use std::path::PathBuf;
 
 use crate::{
-    model::{recent::RecentFile, table_path::resolve_table_path},
+    model::{document::resolve_table_path, recent::RecentFile},
     theme::Theme,
     widget::{
         logo::{LOGO_HEIGHT, Logo},
@@ -21,14 +21,25 @@ pub struct MenuScreen {
     cwd: PathBuf,
     logo: Logo,
     tabs: Tabs,
+    status_message: Option<String>,
 }
 
 impl MenuScreen {
     pub fn new(theme: Theme, cwd: PathBuf, recent_files: Vec<RecentFile>) -> Self {
+        Self::with_status(theme, cwd, recent_files, None)
+    }
+
+    pub fn with_status(
+        theme: Theme,
+        cwd: PathBuf,
+        recent_files: Vec<RecentFile>,
+        status_message: Option<String>,
+    ) -> Self {
         Self {
             cwd,
             logo: Logo::new(theme),
             tabs: Tabs::new(theme, recent_files),
+            status_message,
         }
     }
 }
@@ -67,5 +78,14 @@ impl Screen for MenuScreen {
 
     fn footer_hint(&self) -> Option<Line<'static>> {
         Some(self.tabs.footer_hint())
+    }
+
+    fn footer_status(&self) -> Option<Line<'static>> {
+        self.status_message.as_ref().map(|message| {
+            Line::styled(
+                message.clone(),
+                ratatui::style::Style::default().fg(ratatui::style::Color::Red),
+            )
+        })
     }
 }

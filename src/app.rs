@@ -13,7 +13,10 @@ use ratatui::{
 
 use crate::{
     exit::ExitHandler,
-    model::{recent::RecentFiles, table_path::resolve_table_path},
+    model::{
+        document::{WorkbookDocument, resolve_table_path},
+        recent::RecentFiles,
+    },
     screen::{EventResult, FrameState, Screen, ScreenCommand, home::MenuScreen},
     theme::Theme,
     widget::footer::Footer,
@@ -64,8 +67,18 @@ impl App {
         let mut recent = RecentFiles::load();
         let active_screen: Box<dyn Screen> = if let Some(file) = initial_file {
             let path = resolve_table_path(&file, &cwd);
-            recent.add(&path);
-            Box::new(crate::screen::editor::TableScreen::new(theme, path))
+            match WorkbookDocument::open_or_create(path) {
+                Ok(document) => {
+                    recent.add(document.path());
+                    Box::new(crate::screen::editor::TableScreen::new(theme, document))
+                }
+                Err(err) => Box::new(MenuScreen::with_status(
+                    theme,
+                    cwd.clone(),
+                    recent.items().to_vec(),
+                    Some(err.message()),
+                )),
+            }
         } else {
             Box::new(MenuScreen::new(theme, cwd.clone(), recent.items().to_vec()))
         };
@@ -162,11 +175,22 @@ impl App {
 
     fn process_cmd(&mut self, cmd: ScreenCommand) {
         match cmd {
-            ScreenCommand::OpenEditor { path } => {
-                self.recent.add(&path);
-                self.active_screen =
-                    Box::new(super::screen::editor::TableScreen::new(self.theme, path));
-            }
+            ScreenCommand::OpenEditor { path } => match WorkbookDocument::open_or_create(path) {
+                Ok(document) => {
+                    self.recent.add(document.path());
+                    self.active_screen = Box::new(super::screen::editor::TableScreen::new(
+                        self.theme, document,
+                    ));
+                }
+                Err(err) => {
+                    self.active_screen = Box::new(MenuScreen::with_status(
+                        self.theme,
+                        self.cwd.clone(),
+                        self.recent.items().to_vec(),
+                        Some(err.message()),
+                    ));
+                }
+            },
             ScreenCommand::RemoveRecent { path } => {
                 self.recent.remove(&path);
                 self.active_screen = Box::new(MenuScreen::new(

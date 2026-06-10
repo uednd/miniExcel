@@ -1,12 +1,12 @@
 use crate::{
     model::{
         cell::{CellAddress, CellValue},
-        workbook::Workbook,
+        document::WorkbookDocument,
+        workbook::{ClearSpec, Workbook},
     },
     screen::ScreenCommand,
     theme::Theme,
 };
-use std::path::PathBuf;
 
 use super::{mode::Selection, viewport::Viewport};
 
@@ -17,11 +17,11 @@ use super::{mode::Selection, viewport::Viewport};
 pub struct TableContext {
     pub theme: Theme,
     pub viewport: Viewport,
-    path: PathBuf,
-    wb: Workbook,
+    document: WorkbookDocument,
     selection: Option<Selection>,
     copied_region: Option<Selection>,
     blink_visible: bool,
+    status_message: Option<String>,
     /// 模式需要切换屏幕时写入，随后由 `ModeHost` 取走。
     pending_command: Option<ScreenCommand>,
 }
@@ -36,37 +36,37 @@ pub struct SelectionStats {
 
 impl TableContext {
     /// 创建编辑器共享状态。
-    pub fn new(theme: Theme, path: PathBuf, wb: Workbook) -> Self {
+    pub fn new(theme: Theme, document: WorkbookDocument) -> Self {
         Self {
             theme,
-            path,
-            wb,
+            document,
             viewport: Viewport::new(),
             selection: None,
             copied_region: None,
             blink_visible: true,
+            status_message: None,
             pending_command: None,
         }
     }
 
     /// 当前工作簿。
     pub fn workbook(&self) -> &Workbook {
-        &self.wb
+        self.document.workbook()
     }
 
     /// 当前工作簿名。
     pub fn workbook_name(&self) -> &str {
-        &self.wb.name
+        &self.document.workbook().name
     }
 
     /// 当前工作簿行数。
     pub fn row_count(&self) -> usize {
-        self.wb.rows
+        self.document.workbook().rows
     }
 
     /// 当前工作簿列数。
     pub fn column_count(&self) -> usize {
-        self.wb.columns
+        self.document.workbook().columns
     }
 
     /// 当前选区。
@@ -93,7 +93,8 @@ impl TableContext {
             return None;
         };
 
-        let (r1, r2, c1, c2) = selection.normalized_bounds(self.wb.rows, self.wb.columns);
+        let wb = self.document.workbook();
+        let (r1, r2, c1, c2) = selection.normalized_bounds(wb.rows, wb.columns);
         if r1 == r2 && c1 == c2 {
             return None;
         }
@@ -105,7 +106,7 @@ impl TableContext {
         for row in r1..=r2 {
             for col in c1..=c2 {
                 let addr = CellAddress { row, col };
-                let Some(cell) = self.wb.get_cell(addr) else {
+                let Some(cell) = wb.get_cell(addr) else {
                     continue;
                 };
 
@@ -149,17 +150,29 @@ impl TableContext {
 
     /// 光标所在单元格的原始文本。
     pub fn current_cell_raw(&self) -> String {
-        self.wb
+        self.document
+            .workbook()
             .get_cell(self.viewport.cursor())
             .map(|cell| cell.raw.clone())
             .unwrap_or_default()
     }
 
     /// 保存当前工作簿。
-    ///
-    /// 保存失败会被忽略；当前界面还没有错误提示位置。
-    pub fn save(&self) {
-        let _ = self.wb.save(&self.path);
+    pub fn save(&mut self) -> bool {
+        match self.document.save() {
+            Ok(()) => {
+                self.status_message = Some(String::from("已保存"));
+                true
+            }
+            Err(err) => {
+                self.status_message = Some(err.message());
+                false
+            }
+        }
+    }
+
+    pub fn status_message(&self) -> Option<&str> {
+        self.status_message.as_deref()
     }
 
     /// 请求编辑器返回首页。
@@ -174,12 +187,16 @@ impl TableContext {
 
     /// 写入光标所在单元格的文本。
     pub fn set_current_cell_text(&mut self, raw: String) {
-        self.wb.set_text(self.viewport.cursor(), raw);
+        self.document
+            .workbook_mut()
+            .set_text(self.viewport.cursor(), raw);
     }
 
     /// 清除光标所在单元格。
     pub fn clear_current_cell(&mut self) {
-        self.wb.clear_cell(self.viewport.cursor());
+        self.document
+            .workbook_mut()
+            .clear_cell(self.viewport.cursor());
     }
 
     /// 复制当前选区的单元格内容到系统剪贴板。
@@ -223,17 +240,18 @@ impl TableContext {
         let paste_rows = rows.len();
         let start = self.viewport.cursor();
 
-        self.wb
+        self.document
+            .workbook_mut()
             .ensure_size(start.row + paste_rows, start.col + paste_cols);
 
         for (r, row_cells) in rows.iter().enumerate() {
             let target_row = start.row + r;
-            if target_row >= self.wb.rows {
+            if target_row >= self.document.workbook().rows {
                 break;
             }
             for (c, cell_text) in row_cells.iter().enumerate() {
                 let target_col = start.col + c;
-                if target_col >= self.wb.columns {
+                if target_col >= self.document.workbook().columns {
                     break;
                 }
                 let addr = CellAddress {
@@ -241,16 +259,20 @@ impl TableContext {
                     col: target_col,
                 };
                 if cell_text.is_empty() {
-                    self.wb.clear_cell(addr);
+                    self.document.workbook_mut().clear_cell(addr);
                 } else {
-                    self.wb.set_text(addr, cell_text.clone());
+                    self.document
+                        .workbook_mut()
+                        .set_text(addr, cell_text.clone());
                 }
             }
         }
 
-        let end_row = (start.row + paste_rows).min(self.wb.rows).saturating_sub(1);
+        let end_row = (start.row + paste_rows)
+            .min(self.document.workbook().rows)
+            .saturating_sub(1);
         let end_col = (start.col + paste_cols)
-            .min(self.wb.columns)
+            .min(self.document.workbook().columns)
             .saturating_sub(1);
 
         self.copied_region = None;
@@ -268,28 +290,33 @@ impl TableContext {
     /// 清空当前选区，并退出选区状态。
     pub fn clear_selection_cells(&mut self) {
         if let Some(spec) = self.selection_clear_spec() {
-            self.wb.clear_region(spec);
+            self.document.workbook_mut().clear_region(spec);
             self.selection = None;
         }
     }
 
     /// 删除光标所在行，并同步裁剪光标和滚动位置。
     pub fn delete_current_row(&mut self) {
-        self.wb.delete_row(self.viewport.cursor_row());
-        self.viewport.clamp_cursor_row(self.wb.rows);
+        self.document
+            .workbook_mut()
+            .delete_row(self.viewport.cursor_row());
+        self.viewport
+            .clamp_cursor_row(self.document.workbook().rows);
     }
 
     /// 删除光标所在列，并同步裁剪光标和滚动位置。
     pub fn delete_current_column(&mut self) {
-        self.wb.delete_column(self.viewport.cursor_col());
-        self.viewport.clamp_cursor_col(self.wb.columns);
+        self.document
+            .workbook_mut()
+            .delete_column(self.viewport.cursor_col());
+        self.viewport
+            .clamp_cursor_col(self.document.workbook().columns);
     }
 
-    fn selection_clear_spec(&self) -> Option<crate::model::workbook::ClearSpec> {
-        use crate::model::workbook::ClearSpec;
-
+    fn selection_clear_spec(&self) -> Option<ClearSpec> {
         self.selection.as_ref().map(|selection| {
-            let (r1, r2, c1, c2) = selection.normalized_bounds(self.wb.rows, self.wb.columns);
+            let wb = self.document.workbook();
+            let (r1, r2, c1, c2) = selection.normalized_bounds(wb.rows, wb.columns);
             match *selection {
                 Selection::Row(r) => ClearSpec::Row(r),
                 Selection::Column(c) => ClearSpec::Column(c),
@@ -304,7 +331,8 @@ impl TableContext {
                 vec![vec![self.current_cell_raw()]]
             }
             Some(selection) => {
-                let (r1, r2, c1, c2) = selection.normalized_bounds(self.wb.rows, self.wb.columns);
+                let wb = self.document.workbook();
+                let (r1, r2, c1, c2) = selection.normalized_bounds(wb.rows, wb.columns);
                 (r1..=r2)
                     .map(|r| (c1..=c2).map(|c| self.cell_raw_at(r, c)).collect())
                     .collect()
@@ -313,7 +341,8 @@ impl TableContext {
     }
 
     fn cell_raw_at(&self, row: usize, col: usize) -> String {
-        self.wb
+        self.document
+            .workbook()
             .get_cell(CellAddress { row, col })
             .map(|cell| cell.raw.clone())
             .unwrap_or_default()

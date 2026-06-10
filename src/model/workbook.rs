@@ -1,8 +1,5 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::fs;
-use std::io;
-use std::path::Path;
 
 use super::cell::{Cell, CellAddress, CellValue};
 use super::limits;
@@ -49,24 +46,6 @@ impl Workbook {
             rows,
             cells: HashMap::new(),
         }
-    }
-
-    /// 将工作簿以 JSON 写入指定路径。
-    ///
-    /// 序列化失败或文件写入失败时返回 `io::Error`。
-    pub fn save<P: AsRef<Path>>(&self, path: P) -> io::Result<()> {
-        let json = serde_json::to_string_pretty(self)?;
-        fs::write(path, json)
-    }
-
-    /// 从指定路径读取工作簿，并在加载后执行公式重算。
-    ///
-    /// 文件读取失败或 JSON 解析失败时返回 `io::Error`。
-    pub fn load<P: AsRef<Path>>(path: P) -> io::Result<Self> {
-        let raw = fs::read_to_string(path)?;
-        let mut wb: Self = serde_json::from_str(&raw)?;
-        wb.recalc();
-        Ok(wb)
     }
 
     /// 读取指定地址的单元格。

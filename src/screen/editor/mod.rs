@@ -9,13 +9,9 @@ mod viewport;
 
 use crossterm::event::{KeyEvent, MouseEvent, MouseEventKind};
 use ratatui::{Frame, layout::Rect, style::Style, widgets::Block};
-use std::path::PathBuf;
 
 use crate::{
-    model::{
-        limits::{MAX_COLUMNS, MAX_ROWS},
-        workbook::Workbook,
-    },
+    model::document::WorkbookDocument,
     theme::Theme,
     widget::table::{TableGrid, TableGridConfig, layout::GridMetrics},
 };
@@ -35,17 +31,8 @@ pub struct TableScreen {
 }
 
 impl TableScreen {
-    pub fn new(theme: Theme, path: PathBuf) -> Self {
-        let wb = Workbook::load(&path).unwrap_or_else(|_| {
-            let name = path
-                .file_stem()
-                .and_then(|s| s.to_str())
-                .unwrap_or("untitled")
-                .to_string();
-            Workbook::new(name, MAX_COLUMNS, MAX_ROWS)
-        });
-
-        let ctx = TableContext::new(theme, path, wb);
+    pub fn new(theme: Theme, document: WorkbookDocument) -> Self {
+        let ctx = TableContext::new(theme, document);
 
         Self {
             ctx,
@@ -125,6 +112,12 @@ impl Screen for TableScreen {
     }
 
     fn footer_status(&self) -> Option<ratatui::text::Line<'static>> {
+        if let Some(message) = self.ctx.status_message() {
+            return Some(ratatui::text::Line::styled(
+                message.to_string(),
+                Style::default().fg(self.ctx.theme.accent),
+            ));
+        }
         self.host.footer(&self.ctx).status
     }
 }

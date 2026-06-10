@@ -30,8 +30,9 @@ impl MenuMode {
                 EventResult::Command(ModeCommand::SwitchMode(Box::new(NavigationMode)))
             }),
             SelectableItem::new("保存并退出", |ctx: &mut TableContext| {
-                ctx.save();
-                ctx.go_home();
+                if ctx.save() {
+                    ctx.go_home();
+                }
                 EventResult::Handled
             }),
             SelectableItem::new("返回首页", |ctx: &mut TableContext| {
