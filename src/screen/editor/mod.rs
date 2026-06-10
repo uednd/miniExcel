@@ -16,7 +16,10 @@ use crate::{
         workbook::Workbook,
     },
     theme::Theme,
-    widget::table::{COL_WIDTH, ROW_NUM_WIDTH, TableGrid, TableGridConfig},
+    widget::table::{
+        layout::GridMetrics,
+        TableGrid, TableGridConfig,
+    },
 };
 
 pub use self::context::TableContext;
@@ -25,11 +28,12 @@ pub use self::viewport::Viewport;
 
 use self::{host::ModeHost, navigation::NavigationMode};
 
-use super::{EventResult, Screen, ScreenCommand};
+use super::{EventResult, FrameState, Screen, ScreenCommand};
 
 pub struct TableScreen {
     ctx: TableContext,
     host: ModeHost,
+    grid_metrics: GridMetrics,
 }
 
 impl TableScreen {
@@ -48,11 +52,16 @@ impl TableScreen {
         Self {
             ctx,
             host: ModeHost::new(Box::new(NavigationMode)),
+            grid_metrics: GridMetrics::new(8, 4, 2),
         }
     }
 }
 
 impl Screen for TableScreen {
+    fn pre_render(&mut self, state: FrameState) {
+        self.ctx.set_blink_visible(state.blink_visible);
+    }
+
     fn render(&mut self, frame: &mut Frame, area: Rect) {
         let table_area = self.host.render(frame, area, &self.ctx);
 
@@ -64,9 +73,9 @@ impl Screen for TableScreen {
         let inner = table_block.inner(table_area);
         frame.render_widget(table_block, table_area);
 
-        let visible_rows = (inner.height.saturating_sub(2) / 2) as usize;
-        let visible_cols = ((inner.width.saturating_sub(ROW_NUM_WIDTH)) / (COL_WIDTH + 1)) as usize;
-        self.ctx.viewport.update_visible(visible_rows, visible_cols);
+        let layout = self.grid_metrics.layout(inner);
+        let cap = layout.visible_capacity();
+        self.ctx.viewport.update_visible(cap.rows, cap.cols);
 
         let edit_buffer = self.host.edit_buffer();
         let selection = self.ctx.selection();
@@ -77,7 +86,9 @@ impl Screen for TableScreen {
             TableGridConfig {
                 wb: self.ctx.workbook(),
                 viewport: &self.ctx.viewport,
+                layout,
                 theme: self.ctx.theme,
+                blink_visible: self.ctx.blink_visible(),
                 edit_buffer,
                 selection,
                 copied_region,

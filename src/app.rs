@@ -1,4 +1,4 @@
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers, MouseEventKind};
 use ratatui::{
@@ -10,18 +10,44 @@ use ratatui::{
 
 use crate::{
     exit::ExitHandler,
-    screen::{EventResult, Screen, ScreenCommand, home::MenuScreen},
+    screen::{EventResult, FrameState, Screen, ScreenCommand, home::MenuScreen},
     theme::Theme,
     widget::footer::Footer,
 };
 
 const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 
+pub struct BlinkState {
+    visible: bool,
+    last_toggle: Instant,
+}
+
+impl BlinkState {
+    pub fn new() -> Self {
+        Self {
+            visible: true,
+            last_toggle: Instant::now(),
+        }
+    }
+
+    pub fn tick(&mut self) {
+        if self.last_toggle.elapsed() > Duration::from_millis(500) {
+            self.visible = !self.visible;
+            self.last_toggle = Instant::now();
+        }
+    }
+
+    pub fn visible(&self) -> bool {
+        self.visible
+    }
+}
+
 pub struct App {
     theme: Theme,
     cwd: String,
     active_screen: Box<dyn Screen>,
     exit_handler: ExitHandler,
+    blink: BlinkState,
     footer: Footer,
 }
 
@@ -38,6 +64,7 @@ impl App {
             cwd: full_cwd.clone(),
             active_screen: Box::new(MenuScreen::new(theme, full_cwd)),
             exit_handler: ExitHandler::new(Duration::from_secs(1)),
+            blink: BlinkState::new(),
             footer: Footer::new(display_cwd, APP_VERSION.to_string(), theme),
         }
     }
@@ -50,6 +77,12 @@ impl App {
             }
 
             self.exit_handler.tick();
+            self.blink.tick();
+
+            let frame_state = FrameState {
+                blink_visible: self.blink.visible(),
+            };
+            self.active_screen.pre_render(frame_state);
 
             let exit_hint = self.exit_handler.hint_text();
             let tip_hint = self.active_screen.footer_hint();

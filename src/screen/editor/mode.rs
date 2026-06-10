@@ -16,8 +16,7 @@ pub type ModeResult = EventResult<ModeCommand>;
 
 /// 表格选区。
 ///
-/// 行、列索引均从 0 开始。矩形选区保存锚点和当前光标，
-/// 使用方负责在需要时归一化端点顺序。
+/// 行、列索引均从 0 开始。矩形选区保存锚点和当前光标。
 #[derive(Clone, Copy)]
 pub enum Selection {
     Row(usize),
@@ -26,6 +25,40 @@ pub enum Selection {
         anchor: CellAddress,
         cursor: CellAddress,
     },
+}
+
+impl Selection {
+    /// 判断给定地址是否在选区内。
+    pub fn contains(&self, addr: CellAddress) -> bool {
+        match *self {
+            Selection::Row(r) => r == addr.row,
+            Selection::Column(c) => c == addr.col,
+            Selection::Range { anchor, cursor } => {
+                let (r1, r2, c1, c2) = Self::normalized(anchor, cursor);
+                addr.row >= r1 && addr.row <= r2 && addr.col >= c1 && addr.col <= c2
+            }
+        }
+    }
+
+    /// 返回选区的归一化边界 `(min_row, max_row, min_col, max_col)`。
+    ///
+    /// Row / Column 选区返回该行/列在所有行/列上的范围。
+    pub fn normalized_bounds(&self, rows: usize, cols: usize) -> (usize, usize, usize, usize) {
+        match *self {
+            Selection::Row(r) => (r, r, 0, cols.saturating_sub(1)),
+            Selection::Column(c) => (0, rows.saturating_sub(1), c, c),
+            Selection::Range { anchor, cursor } => Self::normalized(anchor, cursor),
+        }
+    }
+
+    pub(crate) fn normalized(anchor: CellAddress, cursor: CellAddress) -> (usize, usize, usize, usize) {
+        (
+            anchor.row.min(cursor.row),
+            anchor.row.max(cursor.row),
+            anchor.col.min(cursor.col),
+            anchor.col.max(cursor.col),
+        )
+    }
 }
 
 /// 编辑器模式种类。

@@ -8,7 +8,6 @@ mod exit;
 mod model;
 mod screen;
 mod theme;
-mod util;
 mod widget;
 
 fn main() -> color_eyre::Result<()> {

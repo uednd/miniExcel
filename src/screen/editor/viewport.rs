@@ -60,9 +60,14 @@ impl Viewport {
     }
 
     /// 更新渲染阶段测量出的可见行列数。
+    /// 仅在终端尺寸变化时触发 scroll_into_view，避免每帧覆盖鼠标滚动。
     pub fn update_visible(&mut self, rows: usize, cols: usize) {
+        let changed = rows != self.visible_rows || cols != self.visible_cols;
         self.visible_rows = rows;
         self.visible_cols = cols;
+        if changed {
+            self.scroll_into_view();
+        }
     }
 
     /// 向上移动光标，并保持光标可见。

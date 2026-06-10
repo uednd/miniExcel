@@ -17,6 +17,7 @@ pub struct TableContext {
     wb: Workbook,
     selection: Option<Selection>,
     copied_region: Option<Selection>,
+    blink_visible: bool,
     /// 模式需要切换屏幕时写入，随后由 `ModeHost` 取走。
     pending_command: Option<ScreenCommand>,
 }
@@ -31,6 +32,7 @@ impl TableContext {
             viewport: Viewport::new(),
             selection: None,
             copied_region: None,
+            blink_visible: true,
             pending_command: None,
         }
     }
@@ -75,6 +77,16 @@ impl TableContext {
     /// `None` 表示没有待粘贴的复制内容。
     pub fn copied_region(&self) -> Option<&Selection> {
         self.copied_region.as_ref()
+    }
+
+    /// 设置当前帧的闪烁可见性。
+    pub fn set_blink_visible(&mut self, visible: bool) {
+        self.blink_visible = visible;
+    }
+
+    /// 当前帧的闪烁可见性。
+    pub fn blink_visible(&self) -> bool {
+        self.blink_visible
     }
 
     /// 光标所在单元格的原始文本。
@@ -220,15 +232,13 @@ impl TableContext {
     fn selection_clear_spec(&self) -> Option<crate::model::workbook::ClearSpec> {
         use crate::model::workbook::ClearSpec;
 
-        self.selection.as_ref().map(|selection| match *selection {
-            Selection::Row(r) => ClearSpec::Row(r),
-            Selection::Column(c) => ClearSpec::Column(c),
-            Selection::Range { anchor, cursor } => ClearSpec::Rect {
-                c1: anchor.col.min(cursor.col),
-                r1: anchor.row.min(cursor.row),
-                c2: anchor.col.max(cursor.col),
-                r2: anchor.row.max(cursor.row),
-            },
+        self.selection.as_ref().map(|selection| {
+            let (r1, r2, c1, c2) = selection.normalized_bounds(self.wb.rows, self.wb.columns);
+            match *selection {
+                Selection::Row(r) => ClearSpec::Row(r),
+                Selection::Column(c) => ClearSpec::Column(c),
+                Selection::Range { .. } => ClearSpec::Rect { c1, r1, c2, r2 },
+            }
         })
     }
 
@@ -237,27 +247,10 @@ impl TableContext {
             None => {
                 vec![vec![self.current_cell_raw()]]
             }
-            Some(Selection::Range { anchor, cursor }) => {
-                let r1 = anchor.row.min(cursor.row);
-                let r2 = anchor.row.max(cursor.row);
-                let c1 = anchor.col.min(cursor.col);
-                let c2 = anchor.col.max(cursor.col);
+            Some(selection) => {
+                let (r1, r2, c1, c2) = selection.normalized_bounds(self.wb.rows, self.wb.columns);
                 (r1..=r2)
                     .map(|r| (c1..=c2).map(|c| self.cell_raw_at(r, c)).collect())
-                    .collect()
-            }
-            Some(Selection::Row(r)) => {
-                let r = *r;
-                vec![
-                    (0..self.wb.columns)
-                        .map(|c| self.cell_raw_at(r, c))
-                        .collect(),
-                ]
-            }
-            Some(Selection::Column(c)) => {
-                let c = *c;
-                (0..self.wb.rows)
-                    .map(|r| vec![self.cell_raw_at(r, c)])
                     .collect()
             }
         }

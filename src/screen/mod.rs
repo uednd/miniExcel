@@ -22,8 +22,17 @@ pub enum ScreenCommand {
     GoHome,
 }
 
+/// 每帧渲染前的状态快照。
+#[derive(Debug, Clone, Copy)]
+pub struct FrameState {
+    pub blink_visible: bool,
+}
+
 /// 可被应用主循环驱动的屏幕。
 pub trait Screen {
+    /// 渲染前的回调，用于推送帧状态（如闪烁相位）到屏幕内部。
+    fn pre_render(&mut self, _state: FrameState) {}
+
     /// 渲染屏幕内容。
     fn render(&mut self, frame: &mut Frame, area: Rect);
 
