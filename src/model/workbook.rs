@@ -33,6 +33,7 @@ pub struct Workbook {
     pub name: String,
     pub columns: usize,
     pub rows: usize,
+    #[serde(with = "cell_map")]
     pub cells: HashMap<CellAddress, Cell>,
 }
 
@@ -189,5 +190,55 @@ impl Workbook {
             }
         }
         self.recalc();
+    }
+}
+
+mod cell_map {
+    use super::{Cell, CellAddress};
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+    use std::collections::HashMap;
+
+    #[derive(Serialize, Deserialize)]
+    struct StoredCell {
+        row: usize,
+        col: usize,
+        cell: Cell,
+    }
+
+    pub fn serialize<S>(
+        cells: &HashMap<CellAddress, Cell>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let stored: Vec<StoredCell> = cells
+            .iter()
+            .map(|(addr, cell)| StoredCell {
+                row: addr.row,
+                col: addr.col,
+                cell: cell.clone(),
+            })
+            .collect();
+        stored.serialize(serializer)
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<HashMap<CellAddress, Cell>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let stored = Vec::<StoredCell>::deserialize(deserializer)?;
+        Ok(stored
+            .into_iter()
+            .map(|entry| {
+                (
+                    CellAddress {
+                        row: entry.row,
+                        col: entry.col,
+                    },
+                    entry.cell,
+                )
+            })
+            .collect())
     }
 }
