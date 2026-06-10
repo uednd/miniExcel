@@ -4,7 +4,6 @@ use crate::{
         document::WorkbookDocument,
         workbook::{ClearSpec, Workbook},
     },
-    screen::ScreenCommand,
     theme::Theme,
 };
 
@@ -22,8 +21,6 @@ pub struct TableContext {
     copied_region: Option<Selection>,
     blink_visible: bool,
     status_message: Option<String>,
-    /// 模式需要切换屏幕时写入，随后由 `ModeHost` 取走。
-    pending_command: Option<ScreenCommand>,
 }
 
 /// 当前选区的统计信息。
@@ -45,7 +42,6 @@ impl TableContext {
             copied_region: None,
             blink_visible: true,
             status_message: None,
-            pending_command: None,
         }
     }
 
@@ -175,18 +171,19 @@ impl TableContext {
         self.status_message.as_deref()
     }
 
-    /// 请求编辑器返回首页。
-    pub fn go_home(&mut self) {
-        self.pending_command = Some(ScreenCommand::GoHome);
+    /// 设置底部状态栏消息。
+    pub fn set_status_message(&mut self, message: impl Into<String>) {
+        self.status_message = Some(message.into());
     }
 
-    /// 取走待处理的屏幕命令。
-    pub fn take_pending_command(&mut self) -> Option<ScreenCommand> {
-        self.pending_command.take()
+    /// 清除底部状态栏消息。
+    #[allow(dead_code)]
+    pub fn clear_status_message(&mut self) {
+        self.status_message = None;
     }
 
     /// 写入光标所在单元格的文本。
-    pub fn set_current_cell_text(&mut self, raw: String) {
+    pub fn commit_current_cell(&mut self, raw: String) {
         self.document
             .workbook_mut()
             .set_text(self.viewport.cursor(), raw);

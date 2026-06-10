@@ -12,8 +12,7 @@ use crate::widget::selectable_list::{SelectableItem, SelectableList};
 
 use super::{
     context::TableContext,
-    mode::{FooterLine, Mode, ModeCommand, ModeKind, ModeResult},
-    navigation::NavigationMode,
+    mode::{EditorIntent, FooterLine, Mode, ModeKind, ModeResult},
 };
 
 const PANEL_WIDTH: u16 = 20;
@@ -27,13 +26,11 @@ pub struct DeleteMode {
 impl DeleteMode {
     pub fn new() -> Self {
         let items = vec![
-            SelectableItem::new("删除整行", |ctx: &mut TableContext| {
-                ctx.delete_current_row();
-                EventResult::Command(ModeCommand::SwitchMode(Box::new(NavigationMode)))
+            SelectableItem::new("删除整行", || {
+                EventResult::Command(EditorIntent::DeleteCurrentRow)
             }),
-            SelectableItem::new("删除整列", |ctx: &mut TableContext| {
-                ctx.delete_current_column();
-                EventResult::Command(ModeCommand::SwitchMode(Box::new(NavigationMode)))
+            SelectableItem::new("删除整列", || {
+                EventResult::Command(EditorIntent::DeleteCurrentColumn)
             }),
         ];
         Self {
@@ -47,7 +44,7 @@ impl Mode for DeleteMode {
         ModeKind::Delete
     }
 
-    fn handle_key(&mut self, ctx: &mut TableContext, key: KeyEvent) -> ModeResult {
+    fn handle_key(&mut self, _ctx: &mut TableContext, key: KeyEvent) -> ModeResult {
         match key.code {
             KeyCode::Up => {
                 self.list.handle_up();
@@ -58,13 +55,15 @@ impl Mode for DeleteMode {
                 EventResult::Handled
             }
             KeyCode::Enter => {
-                if let Some(action) = self.list.handle_enter(ctx) {
+                if let Some(action) = self.list.handle_enter() {
                     action
                 } else {
                     EventResult::Handled
                 }
             }
-            KeyCode::Esc => EventResult::Command(ModeCommand::SwitchMode(Box::new(NavigationMode))),
+            KeyCode::Esc => EventResult::Command(EditorIntent::SwitchMode(Box::new(
+                super::navigation::NavigationMode,
+            ))),
             _ => EventResult::Handled,
         }
     }

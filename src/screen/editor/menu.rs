@@ -12,8 +12,7 @@ use crate::widget::selectable_list::{SelectableItem, SelectableList};
 
 use super::{
     context::TableContext,
-    mode::{FooterLine, Mode, ModeCommand, ModeKind, ModeResult},
-    navigation::NavigationMode,
+    mode::{EditorIntent, FooterLine, Mode, ModeKind, ModeResult},
 };
 
 const MENU_WIDTH: u16 = 20;
@@ -25,19 +24,12 @@ pub struct MenuMode {
 impl MenuMode {
     pub fn new() -> Self {
         let items = vec![
-            SelectableItem::new("保存", |ctx: &mut TableContext| {
-                ctx.save();
-                EventResult::Command(ModeCommand::SwitchMode(Box::new(NavigationMode)))
+            SelectableItem::new("保存", || EventResult::Command(EditorIntent::Save)),
+            SelectableItem::new("保存并退出", || {
+                EventResult::Command(EditorIntent::SaveAndGoHome)
             }),
-            SelectableItem::new("保存并退出", |ctx: &mut TableContext| {
-                if ctx.save() {
-                    ctx.go_home();
-                }
-                EventResult::Handled
-            }),
-            SelectableItem::new("返回首页", |ctx: &mut TableContext| {
-                ctx.go_home();
-                EventResult::Handled
+            SelectableItem::new("返回首页", || {
+                EventResult::Command(EditorIntent::GoHome)
             }),
         ];
         Self {
@@ -51,7 +43,7 @@ impl Mode for MenuMode {
         ModeKind::Menu
     }
 
-    fn handle_key(&mut self, ctx: &mut TableContext, key: KeyEvent) -> ModeResult {
+    fn handle_key(&mut self, _ctx: &mut TableContext, key: KeyEvent) -> ModeResult {
         match key.code {
             KeyCode::Up => {
                 self.list.handle_up();
@@ -62,7 +54,7 @@ impl Mode for MenuMode {
                 EventResult::Handled
             }
             KeyCode::Enter => {
-                if let Some(action) = self.list.handle_enter(ctx) {
+                if let Some(action) = self.list.handle_enter() {
                     action
                 } else {
                     EventResult::Handled

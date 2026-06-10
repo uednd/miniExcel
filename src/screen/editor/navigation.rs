@@ -6,7 +6,7 @@ use crate::screen::EventResult;
 use super::{
     context::TableContext,
     edit::EditMode,
-    mode::{FooterLine, Mode, ModeCommand, ModeKind, ModeResult, Selection},
+    mode::{EditorIntent, FooterLine, Mode, ModeKind, ModeResult, Selection},
 };
 
 enum NavigationKey {
@@ -120,13 +120,13 @@ impl Mode for NavigationMode {
         match key.code {
             KeyCode::Enter => {
                 let existing = ctx.current_cell_raw();
-                EventResult::Command(ModeCommand::SwitchMode(Box::new(EditMode::new(
+                EventResult::Command(EditorIntent::SwitchMode(Box::new(EditMode::new(
                     existing, None,
                 ))))
             }
             KeyCode::Char(c) => {
                 let existing = ctx.current_cell_raw();
-                EventResult::Command(ModeCommand::SwitchMode(Box::new(EditMode::new(
+                EventResult::Command(EditorIntent::SwitchMode(Box::new(EditMode::new(
                     existing,
                     Some(c),
                 ))))

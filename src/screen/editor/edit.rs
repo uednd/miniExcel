@@ -11,7 +11,7 @@ use crate::screen::EventResult;
 
 use super::{
     context::TableContext,
-    mode::{FooterLine, Mode, ModeCommand, ModeKind, ModeResult},
+    mode::{EditorIntent, FooterLine, Mode, ModeKind, ModeResult},
     navigation::NavigationMode,
 };
 
@@ -38,10 +38,12 @@ impl Mode for EditMode {
     fn handle_key(&mut self, ctx: &mut TableContext, key: KeyEvent) -> ModeResult {
         match key.code {
             KeyCode::Enter => {
-                ctx.set_current_cell_text(self.buffer.clone());
-                EventResult::Command(ModeCommand::SwitchMode(Box::new(NavigationMode)))
+                let _ = ctx;
+                EventResult::Command(EditorIntent::CommitEdit(self.buffer.clone()))
             }
-            KeyCode::Esc => EventResult::Command(ModeCommand::SwitchMode(Box::new(NavigationMode))),
+            KeyCode::Esc => {
+                EventResult::Command(EditorIntent::SwitchMode(Box::new(NavigationMode)))
+            }
             KeyCode::Backspace => {
                 self.buffer.pop();
                 EventResult::Handled

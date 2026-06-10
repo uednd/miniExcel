@@ -6,26 +6,19 @@ use ratatui::{
     widgets::{List, ListItem},
 };
 
-use crate::{
-    screen::editor::{ModeResult, TableContext},
-    theme::Theme,
-};
+use crate::{screen::editor::ModeResult, theme::Theme};
 
 /// 编辑器命令列表中的一项。
 ///
-/// `action` 直接接收 `TableContext`，因此该类型目前服务于编辑器模式，
-/// 不是独立于编辑器的通用列表项。
+/// `action` 返回编辑器意图；具体状态修改由编辑器会话统一执行。
 pub struct SelectableItem {
     pub label: String,
-    pub action: Box<dyn Fn(&mut TableContext) -> ModeResult>,
+    pub action: Box<dyn Fn() -> ModeResult>,
 }
 
 impl SelectableItem {
     /// 创建一个带标签和执行动作的列表项。
-    pub fn new(
-        label: impl Into<String>,
-        action: impl Fn(&mut TableContext) -> ModeResult + 'static,
-    ) -> Self {
+    pub fn new(label: impl Into<String>, action: impl Fn() -> ModeResult + 'static) -> Self {
         Self {
             label: label.into(),
             action: Box::new(action),
@@ -66,8 +59,8 @@ impl SelectableList {
     /// 执行当前选中项的动作。
     ///
     /// 如果列表为空，返回 `None`。
-    pub fn handle_enter(&self, ctx: &mut TableContext) -> Option<ModeResult> {
-        self.items.get(self.selected).map(|item| (item.action)(ctx))
+    pub fn handle_enter(&self) -> Option<ModeResult> {
+        self.items.get(self.selected).map(|item| (item.action)())
     }
 
     /// 在指定区域内渲染选择列表。

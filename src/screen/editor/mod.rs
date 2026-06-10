@@ -1,13 +1,13 @@
 mod context;
 mod delete;
 mod edit;
-mod host;
 mod menu;
 mod mode;
 mod navigation;
+mod session;
 mod viewport;
 
-use crossterm::event::{KeyEvent, MouseEvent, MouseEventKind};
+use crossterm::event::{KeyEvent, MouseEvent};
 use ratatui::{Frame, layout::Rect, style::Style, widgets::Block};
 
 use crate::{
@@ -16,27 +16,22 @@ use crate::{
     widget::table::{TableGrid, TableGridConfig, layout::GridMetrics},
 };
 
-pub use self::context::TableContext;
 pub use self::mode::{ModeResult, Selection};
 pub use self::viewport::Viewport;
 
-use self::{host::ModeHost, navigation::NavigationMode};
+use self::session::EditorSession;
 
 use super::{EventResult, FrameState, Screen, ScreenCommand};
 
 pub struct TableScreen {
-    ctx: TableContext,
-    host: ModeHost,
+    session: EditorSession,
     grid_metrics: GridMetrics,
 }
 
 impl TableScreen {
     pub fn new(theme: Theme, document: WorkbookDocument) -> Self {
-        let ctx = TableContext::new(theme, document);
-
         Self {
-            ctx,
-            host: ModeHost::new(Box::new(NavigationMode)),
+            session: EditorSession::new(theme, document),
             grid_metrics: GridMetrics::new(8, 4, 2),
         }
     }
@@ -44,80 +39,54 @@ impl TableScreen {
 
 impl Screen for TableScreen {
     fn pre_render(&mut self, state: FrameState) {
-        self.ctx.set_blink_visible(state.blink_visible);
+        self.session.pre_render(state);
     }
 
     fn render(&mut self, frame: &mut Frame, area: Rect) {
-        let table_area = self.host.render(frame, area, &self.ctx);
+        let table_area = self.session.render_mode(frame, area);
 
         let table_block = Block::default()
             .borders(ratatui::widgets::Borders::ALL)
-            .border_style(Style::default().fg(self.ctx.theme.accent))
-            .title(format!(" {} ", self.ctx.workbook_name()));
+            .border_style(Style::default().fg(self.session.theme().accent))
+            .title(format!(" {} ", self.session.workbook_name()));
 
         let inner = table_block.inner(table_area);
         frame.render_widget(table_block, table_area);
 
         let layout = self.grid_metrics.layout(inner);
         let cap = layout.visible_capacity();
-        self.ctx.viewport.update_visible(cap.rows, cap.cols);
+        self.session.update_visible_capacity(cap.rows, cap.cols);
 
-        let edit_buffer = self.host.edit_buffer();
-        let selection = self.ctx.selection();
-        let copied_region = self.ctx.copied_region();
+        let parts = self.session.table_parts();
         TableGrid::render(
             frame,
             inner,
             TableGridConfig {
-                wb: self.ctx.workbook(),
-                viewport: &self.ctx.viewport,
+                wb: parts.workbook,
+                viewport: parts.viewport,
                 layout,
-                theme: self.ctx.theme,
-                blink_visible: self.ctx.blink_visible(),
-                edit_buffer,
-                selection,
-                copied_region,
+                theme: parts.theme,
+                blink_visible: parts.blink_visible,
+                edit_buffer: parts.edit_buffer,
+                selection: parts.selection,
+                copied_region: parts.copied_region,
             },
         );
     }
 
     fn handle_key(&mut self, key: KeyEvent) -> EventResult<ScreenCommand> {
-        self.host.handle_key(&mut self.ctx, key)
+        self.session.handle_key(key)
     }
 
     fn handle_scroll(&mut self, event: MouseEvent) -> EventResult<ScreenCommand> {
-        match event.kind {
-            MouseEventKind::ScrollUp => {
-                self.ctx.viewport.scroll_up(3);
-                EventResult::Handled
-            }
-            MouseEventKind::ScrollDown => {
-                self.ctx.viewport.scroll_down(3, self.ctx.row_count());
-                EventResult::Handled
-            }
-            MouseEventKind::ScrollLeft => {
-                self.ctx.viewport.scroll_left(1);
-                EventResult::Handled
-            }
-            MouseEventKind::ScrollRight => {
-                self.ctx.viewport.scroll_right(1, self.ctx.column_count());
-                EventResult::Handled
-            }
-            _ => EventResult::Ignored,
-        }
+        self.session.handle_scroll(event)
     }
 
     fn footer_hint(&self) -> Option<ratatui::text::Line<'static>> {
-        self.host.footer(&self.ctx).hint
+        self.session.footer_hint()
     }
 
     fn footer_status(&self) -> Option<ratatui::text::Line<'static>> {
-        if let Some(message) = self.ctx.status_message() {
-            return Some(ratatui::text::Line::styled(
-                message.to_string(),
-                Style::default().fg(self.ctx.theme.accent),
-            ));
-        }
-        self.host.footer(&self.ctx).status
+        self.session.footer_status()
     }
 }

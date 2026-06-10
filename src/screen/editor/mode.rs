@@ -5,14 +5,29 @@ use super::context::TableContext;
 use crate::model::cell::CellAddress;
 use crate::screen::EventResult;
 
-/// 编辑器模式产生的命令。
-pub enum ModeCommand {
+/// 编辑器模式产生的意图。
+///
+/// 模式只描述“用户想做什么”，具体如何修改工作簿、保存或切换屏幕，
+/// 由 `EditorSession` 统一应用。
+pub enum EditorIntent {
     /// 切换到另一个编辑器模式。
     SwitchMode(Box<dyn Mode>),
+    /// 提交当前单元格的编辑文本。
+    CommitEdit(String),
+    /// 保存当前工作簿。
+    Save,
+    /// 保存成功后返回首页。
+    SaveAndGoHome,
+    /// 不保存，直接返回首页。
+    GoHome,
+    /// 删除当前行。
+    DeleteCurrentRow,
+    /// 删除当前列。
+    DeleteCurrentColumn,
 }
 
 /// 编辑器模式处理按键后的结果。
-pub type ModeResult = EventResult<ModeCommand>;
+pub type ModeResult = EventResult<EditorIntent>;
 
 /// 表格选区。
 ///
