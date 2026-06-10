@@ -242,11 +242,25 @@ fn selection_to_region_rect(
 fn cell_text(wb: &Workbook, col: usize, row: usize) -> String {
     if let Some(cell) = wb.get_cell(CellAddress { row, col }) {
         match &cell.value {
-            CellValue::Number(n) => n.to_string(),
+            CellValue::Number(n) => format_number(*n),
             CellValue::Text(t) => t.clone(),
             CellValue::Empty => String::new(),
+            CellValue::Error(e) => e.display().to_string(),
         }
     } else {
         String::new()
     }
+}
+
+fn format_number(n: f64) -> String {
+    if n == 0.0 {
+        return "0".to_string();
+    }
+    let abs = n.abs();
+    if abs < 1e-6 || abs >= 1e12 {
+        return format!("{:.2e}", n);
+    }
+    let s = format!("{:.10}", n);
+    let s = s.trim_end_matches('0');
+    s.trim_end_matches('.').to_string()
 }

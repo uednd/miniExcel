@@ -2,6 +2,7 @@ use std::sync::LazyLock;
 
 use serde::{Deserialize, Serialize};
 
+use super::formula::error::CellError;
 use super::limits::MAX_COLUMNS;
 
 /// 单元格地址，使用从 0 开始的行列索引。
@@ -28,15 +29,16 @@ impl CellAddress {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Cell {
     pub raw: String,
-    pub value: CellValue, // TODO：公式解析
+    pub value: CellValue,
 }
 
 /// 单元格当前可渲染的值。
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum CellValue {
     Number(f64),
     Text(String),
     Empty,
+    Error(CellError),
 }
 
 static COL_NAMES: LazyLock<Vec<String>> = LazyLock::new(|| {

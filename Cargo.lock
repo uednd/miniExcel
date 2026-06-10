@@ -936,6 +936,8 @@ dependencies = [
  "arboard",
  "color-eyre",
  "crossterm",
+ "pest",
+ "pest_derive",
  "ratatui",
  "replace-homedir",
  "serde",

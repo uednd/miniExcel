@@ -58,12 +58,14 @@ impl Workbook {
         fs::write(path, json)
     }
 
-    /// 从指定路径读取工作簿。
+    /// 从指定路径读取工作簿，并在加载后执行公式重算。
     ///
     /// 文件读取失败或 JSON 解析失败时返回 `io::Error`。
     pub fn load<P: AsRef<Path>>(path: P) -> io::Result<Self> {
         let raw = fs::read_to_string(path)?;
-        Ok(serde_json::from_str(&raw)?)
+        let mut wb: Self = serde_json::from_str(&raw)?;
+        wb.recalc();
+        Ok(wb)
     }
 
     /// 读取指定地址的单元格。
@@ -75,19 +77,32 @@ impl Workbook {
 
     /// 写入指定地址的文本。
     ///
-    /// 该方法不检查地址是否越界，调用者负责传入合法地址。空文本会清除单元格。
+    /// 该方法不检查地址是否越界，调用者负责传入合法地址。
+    /// 空文本会清除单元格。
+    /// 以 `=` 开头的文本会被识别为公式并触发重算。
     pub fn set_text(&mut self, addr: CellAddress, raw: String) {
         if raw.is_empty() {
             self.clear_cell(addr);
-        } else {
-            self.cells.insert(
-                addr,
-                Cell {
-                    value: CellValue::Text(raw.clone()),
-                    raw,
-                },
-            );
+            return;
         }
+
+        let is_formula = raw.starts_with('=');
+        let value = if is_formula {
+            CellValue::Empty
+        } else {
+            CellValue::Text(raw.clone())
+        };
+
+        self.cells.insert(addr, Cell { raw, value });
+
+        if is_formula {
+            self.recalc();
+        }
+    }
+
+    /// 重算所有公式单元格。
+    pub fn recalc(&mut self) {
+        super::formula::recalc(self);
     }
 
     /// 清除指定地址的单元格内容。
@@ -127,6 +142,7 @@ impl Workbook {
         }
         self.cells = new_cells;
         self.rows -= 1;
+        self.recalc();
     }
 
     /// 删除指定列，该列左侧的列不动，右侧列左移，总列数减一。
@@ -153,6 +169,7 @@ impl Workbook {
         }
         self.cells = new_cells;
         self.columns -= 1;
+        self.recalc();
     }
 
     /// 清空指定区域内的所有单元格，不改变行列数。
@@ -170,5 +187,6 @@ impl Workbook {
                 });
             }
         }
+        self.recalc();
     }
 }

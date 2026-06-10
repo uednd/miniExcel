@@ -1,0 +1,19 @@
+WHITESPACE = _{ " " | "\t" }
+
+number = @{ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT+)? }
+cell_ref = @{ ASCII_ALPHA ~ ASCII_ALPHA? ~ ASCII_DIGIT+ }
+range = { cell_ref ~ ":" ~ cell_ref }
+function_name = @{ "SUM" | "AVERAGE" | "MIN" | "MAX" | "COUNT" }
+
+arg_list = { term ~ ("," ~ term)* }
+function_call = { function_name ~ "(" ~ arg_list ~ ")" }
+
+add_op = { "+" | "-" }
+mul_op = { "*" | "/" }
+
+primary = _{ number | function_call | range | cell_ref | "(" ~ term ~ ")" }
+unary = { ("-")? ~ primary }
+factor = { unary ~ (mul_op ~ unary)* }
+term = { factor ~ (add_op ~ factor)* }
+
+formula = { SOI ~ term ~ EOI }
