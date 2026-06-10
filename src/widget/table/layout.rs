@@ -136,8 +136,9 @@ impl GridLayout {
     }
 
     pub fn horizontal_grid_ys(&self, visible_rows: usize) -> Vec<u16> {
-        (0..visible_rows)
+        (0..=visible_rows)
             .map(|r| self.area.y + 1 + r as u16 * self.metrics.rows_per_cell)
+            .filter(|&y| y < self.area.bottom())
             .collect()
     }
 
