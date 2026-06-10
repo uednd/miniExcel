@@ -51,7 +51,10 @@ impl Selection {
         }
     }
 
-    pub(crate) fn normalized(anchor: CellAddress, cursor: CellAddress) -> (usize, usize, usize, usize) {
+    pub(crate) fn normalized(
+        anchor: CellAddress,
+        cursor: CellAddress,
+    ) -> (usize, usize, usize, usize) {
         (
             anchor.row.min(cursor.row),
             anchor.row.max(cursor.row),

@@ -161,11 +161,7 @@ impl TableGrid {
 
         // 光标单元格高亮边框
         if let Some(cell_rect) = cursor_cell_rect(&cfg.layout, vp, cursor, cfg.selection) {
-            draw::draw_cell_border(
-                buffer,
-                cell_rect,
-                Style::default().fg(cfg.theme.accent),
-            );
+            draw::draw_cell_border(buffer, cell_rect, Style::default().fg(cfg.theme.accent));
         }
     }
 }

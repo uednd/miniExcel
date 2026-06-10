@@ -5,8 +5,7 @@ use crate::model::cell::{CellAddress, CellValue};
 use super::{
     ast::{BinaryOp, Expr, UnaryOp},
     error::CellError,
-    functions,
-    parser,
+    functions, parser,
 };
 
 pub trait CellReader {

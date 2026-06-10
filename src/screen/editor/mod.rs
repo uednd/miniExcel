@@ -16,10 +16,7 @@ use crate::{
         workbook::Workbook,
     },
     theme::Theme,
-    widget::table::{
-        layout::GridMetrics,
-        TableGrid, TableGridConfig,
-    },
+    widget::table::{TableGrid, TableGridConfig, layout::GridMetrics},
 };
 
 pub use self::context::TableContext;

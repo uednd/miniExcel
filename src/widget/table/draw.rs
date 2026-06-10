@@ -1,8 +1,4 @@
-use ratatui::{
-    buffer::Buffer,
-    layout::Rect,
-    style::Style,
-};
+use ratatui::{buffer::Buffer, layout::Rect, style::Style};
 
 use super::primitives::{BorderStroke, CellRect, RegionRect};
 
@@ -42,7 +38,9 @@ pub fn draw_region_border(
         bottom_y: bottom,
     } = region;
 
-    buffer[(left, top)].set_symbol(glyphs.top_left).set_style(style);
+    buffer[(left, top)]
+        .set_symbol(glyphs.top_left)
+        .set_style(style);
     buffer[(right, top)]
         .set_symbol(glyphs.top_right)
         .set_style(style);
@@ -54,13 +52,17 @@ pub fn draw_region_border(
         .set_style(style);
 
     for x in left + 1..right {
-        buffer[(x, top)].set_symbol(glyphs.horizontal).set_style(style);
+        buffer[(x, top)]
+            .set_symbol(glyphs.horizontal)
+            .set_style(style);
         buffer[(x, bottom)]
             .set_symbol(glyphs.horizontal)
             .set_style(style);
     }
     for y in top + 1..bottom {
-        buffer[(left, y)].set_symbol(glyphs.vertical).set_style(style);
+        buffer[(left, y)]
+            .set_symbol(glyphs.vertical)
+            .set_style(style);
         buffer[(right, y)]
             .set_symbol(glyphs.vertical)
             .set_style(style);

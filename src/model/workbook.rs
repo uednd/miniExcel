@@ -105,9 +105,10 @@ impl Workbook {
         super::formula::recalc(self);
     }
 
-    /// 清除指定地址的单元格内容。
+    /// 清除指定地址的单元格内容并触发重算。
     pub fn clear_cell(&mut self, addr: CellAddress) {
         self.cells.remove(&addr);
+        self.recalc();
     }
 
     /// 确保表格行列数不小于指定值。

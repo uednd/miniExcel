@@ -7,10 +7,7 @@ pub struct FunctionArgs {
     pub count: usize,
 }
 
-pub fn collect_values(
-    args: &[CellValue],
-    _name: &FunctionName,
-) -> FunctionArgs {
+pub fn collect_values(args: &[CellValue], _name: &FunctionName) -> FunctionArgs {
     let mut values = Vec::new();
 
     for arg in args {
@@ -48,18 +45,22 @@ pub fn evaluate(name: &FunctionName, collected: &FunctionArgs) -> CellValue {
             CellValue::Number(collected.values.iter().sum::<f64>() / collected.values.len() as f64)
         }
         FunctionName::Min => {
-            if let Some(min) = collected.values.iter().fold(None::<f64>, |acc, &x| {
-                Some(acc.map_or(x, |a| a.min(x)))
-            }) {
+            if let Some(min) = collected
+                .values
+                .iter()
+                .fold(None::<f64>, |acc, &x| Some(acc.map_or(x, |a| a.min(x))))
+            {
                 CellValue::Number(min)
             } else {
                 CellValue::Number(0.0)
             }
         }
         FunctionName::Max => {
-            if let Some(max) = collected.values.iter().fold(None::<f64>, |acc, &x| {
-                Some(acc.map_or(x, |a| a.max(x)))
-            }) {
+            if let Some(max) = collected
+                .values
+                .iter()
+                .fold(None::<f64>, |acc, &x| Some(acc.map_or(x, |a| a.max(x))))
+            {
                 CellValue::Number(max)
             } else {
                 CellValue::Number(0.0)

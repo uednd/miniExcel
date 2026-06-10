@@ -36,8 +36,7 @@ pub struct GridLayout {
 
 impl GridLayout {
     pub fn visible_capacity(&self) -> VisibleCapacity {
-        let rows =
-            (self.area.height.saturating_sub(2) / self.metrics.rows_per_cell) as usize;
+        let rows = (self.area.height.saturating_sub(2) / self.metrics.rows_per_cell) as usize;
         let cols = ((self.area.width.saturating_sub(self.metrics.row_num_width))
             / (self.metrics.col_width + 1)) as usize;
         VisibleCapacity { rows, cols }
@@ -86,8 +85,10 @@ impl GridLayout {
         let left = self.col_grid_x(vis_c1);
         let right = self.col_grid_x(vis_c2 + 1);
         let top = self.area.y + 1 + vis_r1 as u16 * self.metrics.rows_per_cell;
-        let bottom =
-            self.area.y + 1 + vis_r2 as u16 * self.metrics.rows_per_cell + self.metrics.rows_per_cell;
+        let bottom = self.area.y
+            + 1
+            + vis_r2 as u16 * self.metrics.rows_per_cell
+            + self.metrics.rows_per_cell;
 
         if left >= right || right > self.area.right() || bottom > self.area.bottom() {
             return None;

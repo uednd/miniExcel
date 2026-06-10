@@ -26,9 +26,7 @@ impl CellReader for WorkbookReader<'_> {
 }
 
 pub fn recalc(wb: &mut Workbook) {
-    let reader = WorkbookReader {
-        cells: &wb.cells,
-    };
+    let reader = WorkbookReader { cells: &wb.cells };
     let mut evaluator = Evaluator::new(&reader);
 
     let addrs: Vec<CellAddress> = wb.cells.keys().copied().collect();
