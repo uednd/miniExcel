@@ -128,6 +128,9 @@ impl Viewport {
     pub fn scroll_into_view(&mut self) {
         let rows = self.visible_rows;
         let cols = self.visible_cols;
+        if rows == 0 || cols == 0 {
+            return;
+        }
         if self.cursor.row < self.scroll_row {
             self.scroll_row = self.cursor.row;
         }
@@ -142,17 +145,19 @@ impl Viewport {
         }
     }
 
-    /// 在删除行后裁剪光标行。
+    /// 在删除行后裁剪光标行，并同步滚动位置。
     pub fn clamp_cursor_row(&mut self, row_count: usize) {
         if self.cursor.row >= row_count {
             self.cursor.row = row_count.saturating_sub(1);
+            self.scroll_into_view();
         }
     }
 
-    /// 在删除列后裁剪光标列。
+    /// 在删除列后裁剪光标列，并同步滚动位置。
     pub fn clamp_cursor_col(&mut self, col_count: usize) {
         if self.cursor.col >= col_count {
             self.cursor.col = col_count.saturating_sub(1);
+            self.scroll_into_view();
         }
     }
 }

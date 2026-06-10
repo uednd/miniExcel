@@ -162,7 +162,7 @@ impl Mode for NavigationMode {
                     ctx.viewport.cursor().display(),
                     Style::default().fg(ctx.theme.accent),
                 ),
-                Span::styled(", 导航模式", Style::default().fg(ctx.theme.text_dim)),
+                Span::styled(", 光标模式", Style::default().fg(ctx.theme.text_dim)),
                 Span::styled("]", Style::default().fg(ctx.theme.text_dim)),
             ])),
         }

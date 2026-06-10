@@ -219,14 +219,12 @@ impl TableContext {
     pub fn delete_current_row(&mut self) {
         self.wb.delete_row(self.viewport.cursor_row());
         self.viewport.clamp_cursor_row(self.wb.rows);
-        self.viewport.scroll_into_view();
     }
 
     /// 删除光标所在列，并同步裁剪光标和滚动位置。
     pub fn delete_current_column(&mut self) {
         self.wb.delete_column(self.viewport.cursor_col());
         self.viewport.clamp_cursor_col(self.wb.columns);
-        self.viewport.scroll_into_view();
     }
 
     fn selection_clear_spec(&self) -> Option<crate::model::workbook::ClearSpec> {
