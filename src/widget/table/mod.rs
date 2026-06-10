@@ -1,6 +1,7 @@
 pub mod draw;
 pub mod layout;
 pub mod primitives;
+pub mod view;
 
 use ratatui::{
     Frame,
@@ -11,17 +12,14 @@ use ratatui::{
 };
 
 use crate::{
-    model::{
-        cell::{CellAddress, CellValue, col_name},
-        workbook::Workbook,
-    },
-    screen::editor::{Selection, Viewport},
+    model::cell::col_name,
     theme::Theme,
 };
 
 use self::{
     layout::GridLayout,
     primitives::{BorderStroke, CellRect, RegionRect},
+    view::{GridScroll, GridSelection},
 };
 
 pub struct TableGrid;
@@ -30,25 +28,22 @@ pub struct TableGrid;
 ///
 /// `layout` 由调用方根据目标区域构造，内部携带坐标映射逻辑。
 pub struct TableGridConfig<'a> {
-    pub wb: &'a Workbook,
-    pub viewport: &'a Viewport,
+    pub scroll: GridScroll,
     pub layout: GridLayout,
     pub theme: Theme,
     pub blink_visible: bool,
     pub edit_buffer: Option<&'a str>,
-    pub selection: Option<&'a Selection>,
-    pub copied_region: Option<&'a Selection>,
+    pub selection: Option<GridSelection>,
+    pub copied_region: Option<GridSelection>,
+    pub cell_text: &'a dyn Fn(usize, usize) -> String,
 }
 
 impl TableGrid {
     /// 渲染表格网格、表头、单元格内容、光标和选区。
     pub fn render(frame: &mut Frame, area: Rect, cfg: TableGridConfig) {
-        let vp = cfg.viewport;
-        let cursor = vp.cursor();
-        let visible_rows = vp.visible_rows();
-        let visible_cols = vp.visible_cols();
+        let sc = cfg.scroll;
 
-        if visible_rows == 0 || visible_cols == 0 {
+        if sc.visible_rows == 0 || sc.visible_cols == 0 {
             return;
         }
 
@@ -60,8 +55,8 @@ impl TableGrid {
         let cell_style = Style::default().fg(cfg.theme.text_dim);
         let grid_style = Style::default().fg(cfg.theme.grid);
 
-        let col_end = (vp.scroll_col() + visible_cols).min(cfg.wb.columns);
-        let rendered_cols = col_end - vp.scroll_col();
+        let col_end = (sc.scroll_col + sc.visible_cols).min(sc.total_cols);
+        let rendered_cols = col_end - sc.scroll_col;
         let widths: Vec<Constraint> = cfg
             .layout
             .table_column_widths(rendered_cols)
@@ -70,10 +65,10 @@ impl TableGrid {
             .collect();
 
         // 表头行
-        let mut header_cells = Vec::with_capacity(col_end.saturating_sub(vp.scroll_col()) + 1);
+        let mut header_cells = Vec::with_capacity(col_end.saturating_sub(sc.scroll_col) + 1);
         header_cells.push(Cell::from("").style(header_style));
-        for ci in vp.scroll_col()..col_end {
-            let style = if ci == cursor.col {
+        for ci in sc.scroll_col..col_end {
+            let style = if ci == sc.cursor.col {
                 selected_header_style
             } else {
                 header_style
@@ -83,13 +78,13 @@ impl TableGrid {
             );
         }
 
-        let row_end = (vp.scroll_row() + visible_rows).min(cfg.wb.rows);
-        let rendered_rows = row_end - vp.scroll_row();
+        let row_end = (sc.scroll_row + sc.visible_rows).min(sc.total_rows);
+        let rendered_rows = row_end - sc.scroll_row;
 
         // 数据行
-        let mut rows: Vec<Row> = Vec::with_capacity(row_end.saturating_sub(vp.scroll_row()));
-        for ri in vp.scroll_row()..row_end {
-            let label_style = if ri == cursor.row {
+        let mut rows: Vec<Row> = Vec::with_capacity(row_end.saturating_sub(sc.scroll_row));
+        for ri in sc.scroll_row..row_end {
+            let label_style = if ri == sc.cursor.row {
                 selected_header_style
             } else {
                 header_style
@@ -98,8 +93,8 @@ impl TableGrid {
                 Cell::from(Line::from((ri + 1).to_string()).alignment(Alignment::Right))
                     .style(label_style),
             ];
-            for ci in vp.scroll_col()..col_end {
-                let text = if ci == cursor.col && ri == cursor.row {
+            for ci in sc.scroll_col..col_end {
+                let text = if ci == sc.cursor.col && ri == sc.cursor.row {
                     if let Some(buffer) = cfg.edit_buffer {
                         if cfg.blink_visible {
                             if buffer.is_empty() {
@@ -111,10 +106,10 @@ impl TableGrid {
                             buffer.to_string()
                         }
                     } else {
-                        cell_text(cfg.wb, ci, ri)
+                        (cfg.cell_text)(ci, ri)
                     }
                 } else {
-                    cell_text(cfg.wb, ci, ri)
+                    (cfg.cell_text)(ci, ri)
                 };
                 content_cells.push(Cell::from(text).style(cell_style));
             }
@@ -136,7 +131,7 @@ impl TableGrid {
         // 绘制选区边框（实线）
         if let Some(sel) = cfg.selection
             && let Some(region) =
-                selection_to_region_rect(&cfg.layout, vp, sel, rendered_rows, rendered_cols)
+                selection_to_region_rect(&cfg.layout, &sc, &sel, rendered_rows, rendered_cols)
         {
             draw::draw_region_border(
                 buffer,
@@ -149,7 +144,7 @@ impl TableGrid {
         // 绘制已复制区域边框（虚线）
         if let Some(region) = cfg.copied_region
             && let Some(rect) =
-                selection_to_region_rect(&cfg.layout, vp, region, rendered_rows, rendered_cols)
+                selection_to_region_rect(&cfg.layout, &sc, &region, rendered_rows, rendered_cols)
         {
             draw::draw_region_border(
                 buffer,
@@ -160,7 +155,7 @@ impl TableGrid {
         }
 
         // 光标单元格高亮边框
-        if let Some(cell_rect) = cursor_cell_rect(&cfg.layout, vp, cursor, cfg.selection) {
+        if let Some(cell_rect) = cursor_cell_rect(&cfg.layout, &sc, cfg.selection) {
             draw::draw_cell_border(buffer, cell_rect, Style::default().fg(cfg.theme.accent));
         }
     }
@@ -168,21 +163,20 @@ impl TableGrid {
 
 fn cursor_cell_rect(
     layout: &GridLayout,
-    viewport: &Viewport,
-    cursor: CellAddress,
-    selection: Option<&Selection>,
+    scroll: &GridScroll,
+    selection: Option<GridSelection>,
 ) -> Option<CellRect> {
     if let Some(sel) = selection
-        && sel.contains(cursor)
+        && sel.contains(scroll.cursor)
     {
         return None;
     }
-    let vis_row = cursor.row.checked_sub(viewport.scroll_row())?;
-    if vis_row >= viewport.visible_rows() {
+    let vis_row = scroll.cursor.row.checked_sub(scroll.scroll_row)?;
+    if vis_row >= scroll.visible_rows {
         return None;
     }
-    let vis_col = cursor.col.checked_sub(viewport.scroll_col())?;
-    if vis_col >= viewport.visible_cols() {
+    let vis_col = scroll.cursor.col.checked_sub(scroll.scroll_col)?;
+    if vis_col >= scroll.visible_cols {
         return None;
     }
     layout.cell_rect(vis_row, vis_col)
@@ -190,73 +184,47 @@ fn cursor_cell_rect(
 
 fn selection_to_region_rect(
     layout: &GridLayout,
-    viewport: &Viewport,
-    selection: &Selection,
+    scroll: &GridScroll,
+    selection: &GridSelection,
     rendered_rows: usize,
     rendered_cols: usize,
 ) -> Option<RegionRect> {
-    let scroll_row = viewport.scroll_row();
-    let scroll_col = viewport.scroll_col();
-
     match *selection {
-        Selection::Row(r) => {
-            let vis_row = r.checked_sub(scroll_row)?;
+        GridSelection::Row(r) => {
+            let vis_row = r.checked_sub(scroll.scroll_row)?;
             if vis_row >= rendered_rows {
                 return None;
             }
             layout.row_region_rect(vis_row, rendered_cols)
         }
-        Selection::Column(c) => {
-            let vis_col = c.checked_sub(scroll_col)?;
+        GridSelection::Column(c) => {
+            let vis_col = c.checked_sub(scroll.scroll_col)?;
             if vis_col >= rendered_cols {
                 return None;
             }
             layout.col_region_rect(vis_col, rendered_rows)
         }
-        Selection::Range { anchor, cursor } => {
-            let (r1, r2, c1, c2) = Selection::normalized(anchor, cursor);
-            if r1 >= scroll_row + rendered_rows || r2 < scroll_row {
+        GridSelection::Range {
+            min_row: r1,
+            max_row: r2,
+            min_col: c1,
+            max_col: c2,
+        } => {
+            if r1 >= scroll.scroll_row + rendered_rows || r2 < scroll.scroll_row {
                 return None;
             }
-            if c1 >= scroll_col + rendered_cols || c2 < scroll_col {
+            if c1 >= scroll.scroll_col + rendered_cols || c2 < scroll.scroll_col {
                 return None;
             }
-            let vis_r1 = r1.max(scroll_row).saturating_sub(scroll_row);
+            let vis_r1 = r1.max(scroll.scroll_row).saturating_sub(scroll.scroll_row);
             let vis_r2 = r2
-                .min(scroll_row + rendered_rows.saturating_sub(1))
-                .saturating_sub(scroll_row);
-            let vis_c1 = c1.max(scroll_col).saturating_sub(scroll_col);
+                .min(scroll.scroll_row + rendered_rows.saturating_sub(1))
+                .saturating_sub(scroll.scroll_row);
+            let vis_c1 = c1.max(scroll.scroll_col).saturating_sub(scroll.scroll_col);
             let vis_c2 = c2
-                .min(scroll_col + rendered_cols.saturating_sub(1))
-                .saturating_sub(scroll_col);
+                .min(scroll.scroll_col + rendered_cols.saturating_sub(1))
+                .saturating_sub(scroll.scroll_col);
             layout.region_rect(vis_r1..=vis_r2, vis_c1..=vis_c2)
         }
     }
-}
-
-/// 从 HashMap 读取单元格并转成显示字符串
-fn cell_text(wb: &Workbook, col: usize, row: usize) -> String {
-    if let Some(cell) = wb.get_cell(CellAddress { row, col }) {
-        match &cell.value {
-            CellValue::Number(n) => format_number(*n),
-            CellValue::Text(t) => t.clone(),
-            CellValue::Empty => String::new(),
-            CellValue::Error(e) => e.display().to_string(),
-        }
-    } else {
-        String::new()
-    }
-}
-
-fn format_number(n: f64) -> String {
-    if n == 0.0 {
-        return "0".to_string();
-    }
-    let abs = n.abs();
-    if !(1e-6..1e12).contains(&abs) {
-        return format!("{:.2e}", n);
-    }
-    let s = format!("{:.10}", n);
-    let s = s.trim_end_matches('0');
-    s.trim_end_matches('.').to_string()
 }

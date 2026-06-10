@@ -93,18 +93,6 @@ pub enum Selection {
 }
 
 impl Selection {
-    /// 判断给定地址是否在选区内。
-    pub fn contains(&self, addr: CellAddress) -> bool {
-        match *self {
-            Selection::Row(r) => r == addr.row,
-            Selection::Column(c) => c == addr.col,
-            Selection::Range { anchor, cursor } => {
-                let (r1, r2, c1, c2) = Self::normalized(anchor, cursor);
-                addr.row >= r1 && addr.row <= r2 && addr.col >= c1 && addr.col <= c2
-            }
-        }
-    }
-
     /// 返回选区的归一化边界 `(min_row, max_row, min_col, max_col)`。
     ///
     /// Row / Column 选区返回该行/列在所有行/列上的范围。
